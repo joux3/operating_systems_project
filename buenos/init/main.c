@@ -202,6 +202,11 @@ void init(void)
     kwrite("Initializing semaphores\n");
     semaphore_init();
 
+    #ifdef CHANGED_1
+      kwrite("Initializing locks and condition variables\n");
+      lock_cond_init();
+    #endif
+
     kwrite("Initializing device drivers\n");
     device_init();
 

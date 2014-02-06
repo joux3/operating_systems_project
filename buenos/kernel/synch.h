@@ -42,4 +42,8 @@
 #include "kernel/sleepq.h"
 #include "kernel/semaphore.h"
 
+#ifdef CHANGED_1
+  #include "kernel/lock_cond.h"
+#endif
+
 #endif /* BUENOS_KERNEL_SYNCH_H */
