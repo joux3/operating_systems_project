@@ -7,6 +7,7 @@
 #include "kernel/assert.h"
 #include "kernel/thread.h"
 #include "lib/libc.h"
+#include "lib/debug.h"
 
 /** Table containing all locks in the system */
 static lock_t lock_table[CONFIG_MAX_LOCKS];
@@ -93,7 +94,7 @@ void lock_release(lock_t *lock) {
     spinlock_acquire(&lock->slock);
 
     lock->thread_count--;
-    if (lock->thread_count > 1) {
+    if (lock->thread_count > 0) {
         sleepq_wake(lock);
     }
 
@@ -128,8 +129,6 @@ cond_t *condition_create(void) {
         return NULL;
     }
 
-    spinlock_reset(&cond_table[cond_id].slock);
-
     return &cond_table[cond_id];
 }
 
@@ -142,13 +141,17 @@ void condition_wait(cond_t *cond, lock_t *condition_lock) {
 
     intr_status = _interrupt_disable();
     
+    DEBUG("cond_debug", "Adding %d to sleep queue for cond %d\n", thread_get_current_thread(), cond);
     sleepq_add(cond);
     lock_release(condition_lock);
+    DEBUG("cond_debug", "Released lock %d to sleep queue for cond %d\n", thread_get_current_thread(), cond);
     thread_switch();
+    DEBUG("cond_debug", "Waking up %d for cond %d\n", thread_get_current_thread(), cond);
+
+    _interrupt_set_state(intr_status);
 
     lock_acquire(condition_lock);
 
-    _interrupt_set_state(intr_status);
 }
 
 void condition_signal(cond_t *cond) {

@@ -58,7 +58,8 @@
 #include "vm/vm.h"
 
 #ifdef CHANGED_1
-   #include "kernel_tests/lock_test.h"
+    #include "kernel_tests/lock_test.h"
+    #include "kernel_tests/buffer_test.h"
 #endif
 
 /**
@@ -108,6 +109,9 @@ void init_startup_fallback(void) {
     #ifdef CHANGED_1
         if (bootargs_get("lock_test") != NULL) {
             lock_test_main();
+        }
+        if (bootargs_get("buffer_test") != NULL) {
+            buffer_test_main();
         }
     #endif
 

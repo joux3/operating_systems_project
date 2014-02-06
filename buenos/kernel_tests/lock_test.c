@@ -3,7 +3,7 @@
 #include "kernel/lock_cond.h"
 #include "kernel/thread.h"
 
-lock_t *lock;
+static lock_t *lock;
 
 void lock_test_thread(uint32_t param) {
     kprintf("stared thread %d\n", param);

@@ -12,7 +12,6 @@ typedef struct {
 } lock_t;
 
 typedef struct {
-  spinlock_t slock;
   int created;
 } cond_t;
 
