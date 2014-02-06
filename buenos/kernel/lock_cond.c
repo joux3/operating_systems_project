@@ -1,6 +1,12 @@
 #ifdef CHANGED_1
 
+#include "kernel/interrupt.h"
+#include "kernel/sleepq.h"
 #include "kernel/lock_cond.h"
+#include "kernel/config.h"
+#include "kernel/assert.h"
+#include "kernel/thread.h"
+#include "lib/libc.h"
 
 /** Table containing all locks in the system */
 static lock_t lock_table[CONFIG_MAX_LOCKS];
@@ -15,14 +21,85 @@ static cond_t cond_table[CONFIG_MAX_CONDITION_VARIABLES];
 static spinlock_t cond_table_slock;
 
 void lock_cond_init(void) {
+    int i;
+
+    spinlock_reset(&lock_table_slock);
+    for(i = 0; i < CONFIG_MAX_LOCKS; i++)
+        lock_table[i].created = 0;
+
+    spinlock_reset(&cond_table_slock);
+    for(i = 0; i < CONFIG_MAX_CONDITION_VARIABLES; i++)
+        cond_table[i].created = 0;
 }
 
 lock_t *lock_create(void) {
-  return 0;
+    interrupt_status_t intr_status;
+    static int next = 0;
+    int i;
+    int lock_id;
+
+    intr_status = _interrupt_disable();
+    spinlock_acquire(&lock_table_slock);
+
+    // find a free lock
+    for(i = 0; i < CONFIG_MAX_LOCKS; i++) {
+        lock_id = next;
+        next = (next + 1) % CONFIG_MAX_LOCKS;
+        if (lock_table[lock_id].created == 0) {
+            lock_table[lock_id].created = 1;
+            break;
+        }
+    }
+
+    spinlock_release(&lock_table_slock);
+    _interrupt_set_state(intr_status);
+
+    if (i == CONFIG_MAX_LOCKS) {
+	/* lock table does not have any free locks, creation fails */
+        return NULL;
+    }
+
+    lock_table[lock_id].thread_count = 0;
+    spinlock_reset(&lock_table[lock_id].slock);
+
+    return &lock_table[lock_id];
 }
-void lock_destroy(lock_t *lock) {}
-void lock_acquire(lock_t *lock) {}
-void lock_release(lock_t *lock) {}
+
+void lock_destroy(lock_t *lock) {
+    lock->created = 0; 
+}
+
+void lock_acquire(lock_t *lock) {
+    interrupt_status_t intr_status;
+
+    intr_status = _interrupt_disable();
+    spinlock_acquire(&lock->slock);
+
+    lock->thread_count++;
+    if (lock->thread_count > 1) {
+        sleepq_add(lock);
+        spinlock_release(&lock->slock);
+        thread_switch();
+    } else {
+        spinlock_release(&lock->slock);
+    }
+    _interrupt_set_state(intr_status);
+}
+
+void lock_release(lock_t *lock) {
+    interrupt_status_t intr_status;
+    
+    intr_status = _interrupt_disable();
+    spinlock_acquire(&lock->slock);
+
+    lock->thread_count--;
+    if (lock->thread_count > 1) {
+        sleepq_wake(lock);
+    }
+
+    spinlock_release(&lock->slock);
+    _interrupt_set_state(intr_status);
+}
 
 cond_t *condition_create(void) {
   return 0;
