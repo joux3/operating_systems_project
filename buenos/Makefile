@@ -38,7 +38,7 @@
 # $Id: Makefile,v 1.36 2012/02/03 12:44:38 tlilja Exp $
 
 ## User configurable variables
-MODULES     := init kernel lib drivers proc vm fs net util
+MODULES     := init kernel lib drivers proc vm fs net util kernel_tests
 CHANGEDFLAGS := -DCHANGED_1 -DCHANGED_2 -DCHANGED_3 -DCHANGED_4 -DCHANGED_5
 PHASE        := 1
 

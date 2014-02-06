@@ -57,6 +57,10 @@
 #include "proc/process.h"
 #include "vm/vm.h"
 
+#ifdef CHANGED_1
+   #include "kernel_tests/lock_test.h"
+#endif
+
 /**
  * Fallback function for system startup. This function is executed
  * if the initial startup program (shell or other userland process given
@@ -100,6 +104,12 @@ void init_startup_fallback(void) {
 
 	DEBUG("debuginit", "Console test done, %d bytes written\n", len);
     }
+
+    #ifdef CHANGED_1
+        if (bootargs_get("lock_test") != NULL) {
+            lock_test_main();
+        }
+    #endif
 
     /* Nothing else to do, so we shut the system down. */
     kprintf("Startup fallback code ends.\n");
