@@ -66,6 +66,14 @@ static struct {
     TID_t tail; /* the last thread in ready to run queue, negative if none */
 } scheduler_ready_to_run = {-1, -1};
 
+#ifdef CHANGED_1
+    /** List of threads that are ready to run, but in thread_sleep */
+    static struct {
+        TID_t head; /* the first thread, negative if none */
+        TID_t tail; /* the last thread, negative if none */
+    } scheduler_sleeping_for_time = {-1, -1};
+#endif
+
 /**
  * Initializes the scheduler current thread table to 0 for each processor.
  */
@@ -91,6 +99,10 @@ void scheduler_add_to_ready_list(TID_t t)
 
     /* Sanity check */
     KERNEL_ASSERT(t >= 0 && t < CONFIG_MAX_THREADS);
+
+    #ifdef CHANGED_1
+        thread_table[t].sleeps_until = 0;
+    #endif
 
     if (scheduler_ready_to_run.tail < 0) {
 	/* ready queue was empty */
@@ -127,40 +139,15 @@ static TID_t scheduler_remove_first_ready(void)
     if(t >= 0) {
         /* Threads in ready queue should be in state Ready */
         KERNEL_ASSERT(thread_table[t].state == THREAD_READY);
-
         #ifdef CHANGED_1
-            uint32_t now_ms = rtc_get_msec();
-            TID_t prev_t = -1;
-            DEBUG("scheduler_sleep", "started with thread %d\n", t);
-            DEBUG("scheduler_sleep", "started thread: time now %d, thread sleeps until %d\n", now_ms, thread_table[t].sleeps_until);
-            while (t != -1 && thread_table[t].sleeps_until >= now_ms) {
-                DEBUG("scheduler_sleep", "time now %d, thread sleeps until %d\n", now_ms, thread_table[t].sleeps_until);
-                KERNEL_ASSERT(thread_table[t].state == THREAD_READY);
-                prev_t = t;
-                t = thread_table[t].next;
-            }
-            DEBUG("scheduler_sleep", "selected thread %d\n", t);
-            
-            if (t != -1) {
-                KERNEL_ASSERT(thread_table[t].sleeps_until < now_ms);
-                /* we found a thread to run */
-                if (prev_t != -1) {
-                    thread_table[prev_t].next = thread_table[t].next; 
-                }
-                if (scheduler_ready_to_run.tail == t) {
-                    scheduler_ready_to_run.tail = prev_t; 
-                }
-                if (scheduler_ready_to_run.head == t) {
-                    scheduler_ready_to_run.head = thread_table[t].next;
-                }
-            }
-        #else
-            if(scheduler_ready_to_run.tail == t) {
-                scheduler_ready_to_run.tail = -1;
-            }
-            scheduler_ready_to_run.head =
-                thread_table[scheduler_ready_to_run.head].next;
+            KERNEL_ASSERT(thread_table[t].sleeps_until == 0);
         #endif
+
+        if(scheduler_ready_to_run.tail == t) {
+            scheduler_ready_to_run.tail = -1;
+        }
+        scheduler_ready_to_run.head =
+            thread_table[scheduler_ready_to_run.head].next;
 
     }
 
@@ -197,6 +184,62 @@ void scheduler_add_ready(TID_t t)
     _interrupt_set_state(intr_status);
 }
 
+#ifdef CHANGED_1
+    void move_done_sleeping_threads_to_ready() {
+        TID_t t;
+        TID_t next_t;
+        TID_t prev_t;
+        uint32_t now_ms;
+
+        t = scheduler_sleeping_for_time.head;
+        prev_t = -1;
+
+        /* Idle thread should never be on the sleeping list. */
+        KERNEL_ASSERT(t != IDLE_THREAD_TID);
+
+        now_ms = rtc_get_msec();
+        while(t >= 0) {
+            next_t = thread_table[t].next;
+            if (now_ms >= thread_table[t].sleeps_until) {
+                scheduler_add_to_ready_list(t);
+                if (prev_t == -1) {
+                    scheduler_sleeping_for_time.head = next_t;
+                } else {
+                    thread_table[prev_t].next = next_t;
+                }
+                if (t == scheduler_sleeping_for_time.tail) {
+                    scheduler_sleeping_for_time.tail = prev_t;
+                }
+            }
+            prev_t = t;
+            t = next_t;
+        }
+    }
+
+    /* must be called while holding the thread_table_slock */
+    void scheduler_add_to_sleeping_list(TID_t t)
+    {
+        /* Idle thread should never go into the ready list */
+        KERNEL_ASSERT(t != IDLE_THREAD_TID);
+
+        /* Sanity check */
+        KERNEL_ASSERT(t >= 0 && t < CONFIG_MAX_THREADS);
+        KERNEL_ASSERT(thread_table[t].sleeps_until > 0);
+
+        if (scheduler_sleeping_for_time.tail < 0) {
+            /* sleeping queue was empty */
+            scheduler_sleeping_for_time.head = t;
+            scheduler_sleeping_for_time.tail = t;
+            thread_table[t].next = -1;
+        } else {
+            /* sleeping queue was not empty */
+            thread_table[scheduler_sleeping_for_time.tail].next = t;
+            thread_table[t].next = -1;
+            scheduler_sleeping_for_time.tail = t;
+        }
+    }
+#endif
+
 
 /**
  * Select next thread for running. Removes the currently running
@@ -232,11 +275,20 @@ void scheduler_schedule(void)
 	current_thread->state = THREAD_FREE;
     } else if(current_thread->sleeps_on != 0) {
 	current_thread->state = THREAD_SLEEPING;
+#ifdef CHANGED_1
+    } else if(current_thread->sleeps_until > 0) {
+        scheduler_add_to_sleeping_list(scheduler_current_thread[this_cpu]); 
+	current_thread->state = THREAD_READY;
+#endif
     } else {
 	if(scheduler_current_thread[this_cpu] != IDLE_THREAD_TID)
 	    scheduler_add_to_ready_list(scheduler_current_thread[this_cpu]);
 	current_thread->state = THREAD_READY;
     }
+
+    #ifdef CHANGED_1 
+        move_done_sleeping_threads_to_ready();
+    #endif
 
     t = scheduler_remove_first_ready();
     thread_table[t].state = THREAD_RUNNING;
