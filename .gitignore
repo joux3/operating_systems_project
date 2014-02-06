@@ -19,6 +19,7 @@
 
 # linker files
 *.map
+*.d
 
 # vim swp
 *.swp
