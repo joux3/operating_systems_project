@@ -75,9 +75,18 @@ typedef struct {
     process_id_t process_id;
     /* pointer to the next thread in list (<0 = end of list) */
     TID_t next; 
+    
+    #ifdef CHANGED_1
+        /* earliest time when the thread should be run even with state THREAD_READY */ 
+        uint32_t sleeps_until;
+    #endif
 
     /* pad to 64 bytes */
+    #ifdef CHANGED_1
+    uint32_t dummy_alignment_fill[8]; 
+    #else
     uint32_t dummy_alignment_fill[9]; 
+    #endif 
 } thread_table_t;
 
 /* function prototypes */
@@ -90,6 +99,10 @@ thread_table_t *thread_get_current_thread_entry(void);
 
 void thread_switch(void);
 #define thread_yield thread_switch
+
+#ifdef CHANGED_1
+    void thread_sleep(uint32_t sleep_ms);
+#endif
 
 void thread_goto_userland(context_t *usercontext);
 

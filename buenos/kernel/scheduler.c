@@ -42,6 +42,10 @@
 #include "lib/libc.h"
 #include "kernel/config.h"
 #include "drivers/timer.h"
+#ifdef CHANGED_1
+    #include "lib/debug.h"
+    #include "drivers/metadev.h"
+#endif
 
 /** @name Scheduler
  *
@@ -123,11 +127,40 @@ static TID_t scheduler_remove_first_ready(void)
     if(t >= 0) {
         /* Threads in ready queue should be in state Ready */
         KERNEL_ASSERT(thread_table[t].state == THREAD_READY);
-	if(scheduler_ready_to_run.tail == t) {
-	    scheduler_ready_to_run.tail = -1;
-	}
-	scheduler_ready_to_run.head =
-	    thread_table[scheduler_ready_to_run.head].next;
+
+        #ifdef CHANGED_1
+            uint32_t now_ms = rtc_get_msec();
+            TID_t prev_t = -1;
+            DEBUG("scheduler_sleep", "started with thread %d\n", t);
+            DEBUG("scheduler_sleep", "started thread: time now %d, thread sleeps until %d\n", now_ms, thread_table[t].sleeps_until);
+            while (t != -1 && thread_table[t].sleeps_until >= now_ms) {
+                DEBUG("scheduler_sleep", "time now %d, thread sleeps until %d\n", now_ms, thread_table[t].sleeps_until);
+                KERNEL_ASSERT(thread_table[t].state == THREAD_READY);
+                prev_t = t;
+                t = thread_table[t].next;
+            }
+            DEBUG("scheduler_sleep", "selected thread %d\n", t);
+            
+            if (t != -1) {
+                KERNEL_ASSERT(thread_table[t].sleeps_until < now_ms);
+                /* we found a thread to run */
+                if (prev_t != -1) {
+                    thread_table[prev_t].next = thread_table[t].next; 
+                }
+                if (scheduler_ready_to_run.tail == t) {
+                    scheduler_ready_to_run.tail = prev_t; 
+                }
+                if (scheduler_ready_to_run.head == t) {
+                    scheduler_ready_to_run.head = thread_table[t].next;
+                }
+            }
+        #else
+            if(scheduler_ready_to_run.tail == t) {
+                scheduler_ready_to_run.tail = -1;
+            }
+            scheduler_ready_to_run.head =
+                thread_table[scheduler_ready_to_run.head].next;
+        #endif
 
     }
 

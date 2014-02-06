@@ -60,6 +60,7 @@
 #ifdef CHANGED_1
     #include "kernel_tests/lock_test.h"
     #include "kernel_tests/buffer_test.h"
+    #include "kernel_tests/sleep_test.h"
 #endif
 
 /**
@@ -112,6 +113,9 @@ void init_startup_fallback(void) {
         }
         if (bootargs_get("buffer_test") != NULL) {
             buffer_test_main();
+        }
+        if (bootargs_get("sleep_test") != NULL) {
+            sleep_test_main();
         }
     #endif
 

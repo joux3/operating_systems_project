@@ -43,6 +43,10 @@
 #include "kernel/config.h"
 #include "kernel/interrupt.h"
 #include "kernel/idle.h"
+#ifdef CHANGED_1
+    #include "drivers/metadev.h"
+    #include "lib/debug.h"
+#endif
 
 /** @name Thread library
  *
@@ -92,6 +96,9 @@ void thread_table_init(void)
 	thread_table[i].pagetable    = NULL;
 	thread_table[i].process_id   = -1;	
 	thread_table[i].next         = -1;	
+        #ifdef CHANGED_1
+            thread_table[i].sleeps_until = 0;
+        #endif
     }
 
     thread_table[IDLE_THREAD_TID].context->cpu_regs[MIPS_REGISTER_SP] =
@@ -171,6 +178,9 @@ TID_t thread_create(void (*func)(uint32_t), uint32_t arg)
     thread_table[tid].sleeps_on    = 0;
     thread_table[tid].process_id   = -1;
     thread_table[tid].next         = -1;
+    #ifdef CHANGED_1
+        thread_table[tid].sleeps_until = 0;
+    #endif
 
     /* Make sure that we always have a valid back reference on context chain */
     thread_table[tid].context->prev_context = thread_table[tid].context;
@@ -232,6 +242,23 @@ void thread_switch(void)
       _interrupt_generate_sw0();
       _interrupt_set_state(intr_status);
 }
+
+
+#ifdef CHANGED_1
+    void thread_sleep(uint32_t sleep_ms) {
+        interrupt_status_t intr_status;
+          
+        intr_status = _interrupt_disable();
+        spinlock_acquire(&thread_table_slock);
+
+        thread_get_current_thread_entry()->sleeps_until = rtc_get_msec() + sleep_ms;
+
+        spinlock_release(&thread_table_slock);
+        thread_switch();
+
+        _interrupt_set_state(intr_status);
+    }
+#endif
 
 /**
  * Return the TID of the calling thread. 
