@@ -39,7 +39,7 @@
 
 ## User configurable variables
 MODULES     := init kernel lib drivers proc vm fs net util
-#CHANGEDFLAGS := -DCHANGED_1 -DCHANGED_2 -DCHANGED_3 -DCHANGED_4 -DCHANGED_5
+CHANGEDFLAGS := -DCHANGED_1 -DCHANGED_2 -DCHANGED_3 -DCHANGED_4 -DCHANGED_5
 PHASE        := 1
 
 ## Below this point, you shouldn't have to change anything.
