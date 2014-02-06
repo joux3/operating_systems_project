@@ -2,6 +2,18 @@
 
 #include "kernel/lock_cond.h"
 
+/** Table containing all locks in the system */
+static lock_t lock_table[CONFIG_MAX_LOCKS];
+
+/** Lock which must be held before accessing the lock_table */
+static spinlock_t lock_table_slock;
+
+/** Table containing all condition variables in the system */
+static cond_t cond_table[CONFIG_MAX_CONDITION_VARIABLES];
+
+/** Lock which must be held before accessing the cond_table */
+static spinlock_t cond_table_slock;
+
 void lock_cond_init(void) {
 }
 

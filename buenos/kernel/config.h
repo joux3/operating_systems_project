@@ -68,6 +68,18 @@
  */
 #define CONFIG_MAX_SEMAPHORES 128
 
+#ifdef CHANGED_1
+  /* Define the maximum number of locks.
+   * Range from 16 to 1024
+   */
+  #define CONFIG_MAX_LOCKS 128
+
+  /* Define the maximum number of condition variables.
+   * Range from 16 to 1024
+   */
+  #define CONFIG_MAX_CONDITION_VARIABLES 128
+#endif
+
 /* Define maximum number of devices.
  * Range from 16 to 128
  */
