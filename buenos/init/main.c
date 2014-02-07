@@ -61,6 +61,7 @@
     #include "kernel_tests/lock_test.h"
     #include "kernel_tests/buffer_test.h"
     #include "kernel_tests/sleep_test.h"
+    #include "kernel_tests/phone_system.h"
 #endif
 
 /**
@@ -117,6 +118,10 @@ void init_startup_fallback(void) {
         if (bootargs_get("sleep_test") != NULL) {
             sleep_test_main();
         }
+        if (bootargs_get("phone_system") != NULL) {
+            phone_system_main();
+        }
+
     #endif
 
     /* Nothing else to do, so we shut the system down. */
