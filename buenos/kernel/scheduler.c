@@ -210,8 +210,9 @@ void scheduler_add_ready(TID_t t)
                 if (t == scheduler_sleeping_for_time.tail) {
                     scheduler_sleeping_for_time.tail = prev_t;
                 }
+            } else {
+                prev_t = t;
             }
-            prev_t = t;
             t = next_t;
         }
     }
