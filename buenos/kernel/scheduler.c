@@ -60,7 +60,7 @@ extern thread_table_t thread_table[CONFIG_MAX_THREADS];
 /** Currently running thread on each CPU */
 TID_t scheduler_current_thread[CONFIG_MAX_CPUS];
 
-/** List of threads ready to be run. */
+/** List of normal priority threads ready to be run. */
 static struct {
     TID_t head; /* the first thread in ready to run queue, negative if none */
     TID_t tail; /* the last thread in ready to run queue, negative if none */
@@ -72,6 +72,12 @@ static struct {
         TID_t head; /* the first thread, negative if none */
         TID_t tail; /* the last thread, negative if none */
     } scheduler_sleeping_for_time = {-1, -1};
+    
+    /** List of high priority threads that are ready to run */
+    static struct {
+        TID_t head;
+        TID_t tail;
+    } scheduler_high_priority_ready_to_run = {-1, -1};
 #endif
 
 /**
@@ -104,17 +110,37 @@ void scheduler_add_to_ready_list(TID_t t)
         thread_table[t].sleeps_until = 0;
     #endif
 
-    if (scheduler_ready_to_run.tail < 0) {
-	/* ready queue was empty */
-	scheduler_ready_to_run.head = t;
-	scheduler_ready_to_run.tail = t;
-	thread_table[t].next = -1;
+    #ifdef CHANGED_1
+    // Add to appropriate ready list according to priority
+    DEBUG("priority", "thread priority: %d\n", thread_table[t].priority);
+    if (thread_table[t].priority == PRIORITY_NORMAL) {
+    #endif
+        if (scheduler_ready_to_run.tail < 0) {
+            /* ready queue was empty */
+            scheduler_ready_to_run.head = t;
+            scheduler_ready_to_run.tail = t;
+            thread_table[t].next = -1;
+        } else {
+            /* ready queue was not empty */
+            thread_table[scheduler_ready_to_run.tail].next = t;
+            thread_table[t].next = -1;
+            scheduler_ready_to_run.tail = t;
+        }
+    #ifdef CHANGED_1
     } else {
-	/* ready queue was not empty */
-	thread_table[scheduler_ready_to_run.tail].next = t;
-	thread_table[t].next = -1;
-	scheduler_ready_to_run.tail = t;
+        if (scheduler_high_priority_ready_to_run.tail < 0) {
+            /* ready queue was empty */
+            scheduler_high_priority_ready_to_run.head = t;
+            scheduler_high_priority_ready_to_run.tail = t;
+            thread_table[t].next = -1;
+        } else {
+            /* ready queue was not empty */
+            thread_table[scheduler_high_priority_ready_to_run.tail].next = t;
+            thread_table[t].next = -1;
+            scheduler_high_priority_ready_to_run.tail = t;
+        }
     }
+    #endif
 }
 
 /**
@@ -133,8 +159,30 @@ static TID_t scheduler_remove_first_ready(void)
 
     t = scheduler_ready_to_run.head;
 
+    #ifdef CHANGED_1
+        TID_t high_priority_t;
+        high_priority_t = scheduler_high_priority_ready_to_run.head;
+    #endif
+
     /* Idle thread should never be on the ready list. */
     KERNEL_ASSERT(t != IDLE_THREAD_TID);
+
+    #ifdef CHANGED_1
+        if(high_priority_t >= 0) {
+            /* Threads in ready queue should be in state Ready */
+            KERNEL_ASSERT(thread_table[high_priority_t].state == THREAD_READY);
+            KERNEL_ASSERT(thread_table[high_priority_t].sleeps_until == 0);
+
+            if(scheduler_high_priority_ready_to_run.tail == high_priority_t) {
+                scheduler_high_priority_ready_to_run.tail = -1;
+            }
+            scheduler_high_priority_ready_to_run.head =
+                thread_table[scheduler_high_priority_ready_to_run.head].next;
+
+        }
+        if (high_priority_t >= 0)
+            return high_priority_t;
+    #endif
 
     if(t >= 0) {
         /* Threads in ready queue should be in state Ready */

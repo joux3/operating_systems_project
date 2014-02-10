@@ -55,6 +55,13 @@ typedef enum {
 
 #define IDLE_THREAD_TID 0
 
+#ifdef CHANGED_1
+    typedef enum {
+        PRIORITY_NORMAL,
+        PRIORITY_HIGH
+    } priority_t;
+#endif
+
 /* thread table data structure */
 typedef struct {
     /* context save areas context and user_context*/
@@ -79,11 +86,13 @@ typedef struct {
     #ifdef CHANGED_1
         /* earliest time when the thread should be run even with state THREAD_READY */ 
         uint32_t sleeps_until;
+        /* thread priority */
+        priority_t priority;
     #endif
 
     /* pad to 64 bytes */
     #ifdef CHANGED_1
-    uint32_t dummy_alignment_fill[8]; 
+    uint32_t dummy_alignment_fill[7]; 
     #else
     uint32_t dummy_alignment_fill[9]; 
     #endif 
@@ -92,6 +101,7 @@ typedef struct {
 /* function prototypes */
 void thread_table_init(void);
 TID_t thread_create(void (*func)(uint32_t), uint32_t arg);
+TID_t thread_create_priority(void (*func)(uint32_t), uint32_t arg, priority_t priority);
 void thread_run(TID_t t);
 
 TID_t thread_get_current_thread(void);

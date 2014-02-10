@@ -62,6 +62,7 @@
     #include "kernel_tests/buffer_test.h"
     #include "kernel_tests/sleep_test.h"
     #include "kernel_tests/phone_system.h"
+    #include "kernel_tests/priority_test.h"
 #endif
 
 /**
@@ -120,6 +121,9 @@ void init_startup_fallback(void) {
         }
         if (bootargs_get("phone_system") != NULL) {
             phone_system_main();
+        }
+        if (bootargs_get("priority_test") != NULL) {
+            priority_test_main();
         }
 
     #endif
