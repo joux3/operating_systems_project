@@ -9,6 +9,7 @@
 #define CALLERS_IN_SYSTEM 10
 #define ANSWERERS_IN_SYSTEM 3
 #define TALK_TIME_MS 1000
+#define TRY_AGAIN_MS 5000
 
 static int free_lines;
 static semaphore_t *sem_lines;
@@ -34,7 +35,7 @@ void phone(void) {
     semaphore_P(sem_phones);
     KERNEL_ASSERT(free_lines < LINES_IN_SYSTEM);
     kprintf("answering thread %d starts talking\n", thread_get_current_thread());
-    //thread_sleep(TALK_TIME_MS);
+    thread_sleep(TALK_TIME_MS);
     semaphore_P(sem_lines);
     free_lines++;
     KERNEL_ASSERT(free_lines <= LINES_IN_SYSTEM);
@@ -50,10 +51,11 @@ void calling_thread(uint32_t param) {
         if (success) {
             kprintf("calling thread %d succeeded in making a call\n",
                     thread_get_current_thread());
-            //thread_sleep(TALK_TIME_MS);
+            thread_sleep(TALK_TIME_MS);
         } else {
             kprintf("calling thread %d failed at making a call, lines full\n",
                     thread_get_current_thread());
+            thread_sleep(TRY_AGAIN_MS);
         }
     }
 }
@@ -71,7 +73,6 @@ int phone_system_main(void)
 {
     // Give the system 5 phone lines to work with
     free_lines = LINES_IN_SYSTEM;
-    // Initialize the semaphores to 0
     sem_lines = semaphore_create(1);
     sem_phones = semaphore_create(0);
     int i;
