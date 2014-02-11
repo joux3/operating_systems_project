@@ -7,3 +7,101 @@ Members
   Olli-Matti Saario
 
 --------
+
+General:
+
+All the test cases can be found from the kernel_tests folder. There are also slight
+modifications in the buenos/init/main.c (the file that hinted that maybe you should
+put some tests here). The desired tests are given as command line arguments when
+starting buenos, as will bee seen from the example runs below.
+
+Assignment 1: Locks and condition variables
+
+The test file lock_cond.c/h contains tests for the lock implementation. It creates
+a single lock that is then accessed by three threads. The threads simply grab the
+lock, try thread switching a bunch of times and proceed to free it, printing their
+progress. Since the threads print their progress just after acquiring the lock and
+just before releasing it, if the prints of the threads don't overlap, the lock is
+keeping their execution separate. We could consider the the part of code between
+acquiring and releasing the lock as the critical section.
+
+You can run the test with the following command:
+
+yams buenos lock_test
+
+And here is a test run:
+
+Welcome. This is YAMS virtual terminal.
+
+BUENOS is a University Educational Nutshell Operating System
+==========================================================
+
+Copyright (C) 2003-2006  Juha Aatrokoski, Timo Lilja,
+  Leena Salmela, Teemu Takanen, Aleksi Virtanen
+See the file COPYING for licensing details.
+
+(Initialization stuff)
+
+Mounting filesystems
+VFS: TFS initialized on disk at 0xb0008030
+VFS: Mounted filesystem volume [testi]
+Initializing networking
+No initial program (initprog), dropping to fallback
+starting lock test
+stared thread 0
+stared thread 1
+stared thread 2
+locked in thread 1
+freeing in thread 1
+locked in thread 0
+freeing in thread 0
+locked in thread 2
+freeing in thread 2
+locked in thread 1
+freeing in thread 1
+locked in thread 0
+freeing in thread 0
+locked in thread 2
+freeing in thread 2
+locked in thread 1
+freeing in thread 1
+locked in thread 0
+freeing in thread 0
+locked in thread 2
+freeing in thread 2
+locked in thread 1
+freeing in thread 1
+locked in thread 0
+freeing in thread 0
+locked in thread 2
+freeing in thread 2
+locked in thread 1
+freeing in thread 1
+locked in thread 0
+freeing in thread 0
+locked in thread 2
+freeing in thread 2
+locked in thread 1
+freeing in thread 1
+locked in thread 0
+freeing in thread 0
+locked in thread 2
+freeing in thread 2
+locked in thread 1
+freeing in thread 1
+locked in thread 0
+freeing in thread 0
+locked in thread 2
+freeing in thread 2
+locked in thread 1
+freeing in thread 1
+
+The lock seems to be working.
+
+The condition variables are used in the implementation of the producer-consumer
+problem, so let's proceed to that.
+
+Assignment 2: Producer-Consumer
+
+The implementation of the producer-producer consumer toy problem also acts as the test
+for condition variables. The implementation resides in the buffer_test.c/h file.
