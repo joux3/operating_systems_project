@@ -41,14 +41,14 @@ Assignment 1
 			-set locks created value to 0
 
 		acquire:
-			-disable interrupts and spinlock locks lock 
+			-disable interrupts and acquire the spinlock of the lock 
 			-add 1 to threadcount
 			-if lock is owned by other thread (threadcount > 1) add current thread to sleep queue for the lock and switch thread
 			-if lock is free continue with current thread
 			-spinlock release and interrupts enabled
 	
 		release:
-			-disable interrupts and spinlock locks lock 
+			-disable interrupts and acquire the spinlock of the lock 
 			-lower threadcount by 1
 			-if there are thread waiting for lock (threadcount > 0) call wake the threads (sleepq_wake)
 			-spinlock release and interrupts enabled
@@ -245,7 +245,7 @@ Assignment 5
 
 3. Motivation behind the solution
 	-since only one additional priority level was desired we used the simplest solution and just made additional handling for that level
-	-more scalable solutions could have been made with f.ex. priority queues but they would have resulted to much code rewrite
+	-more scalable solutions could have been made with f.ex. priority queues but they would have resulted in much code rewrite
 
 4. Changes made to the plan presented in the review session
 	-NONE
