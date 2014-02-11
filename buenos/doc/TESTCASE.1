@@ -523,3 +523,106 @@ it's used in two places in the system (answering threads sleep after answering t
 talking on the phone, calling threads will wait upon successful and failed calls to simulate
 talking and waiting to try again, respectively).
 
+Assignment 5: Priority queues
+
+We also implemented the simple thread priority (with high and normal priorities) and there is a
+test file for those that as well, priority_test.c/h. The priority test is very simple - it spawns
+3 high priority threads and 20 normal priority threads and the expected outcome is that mostly
+the high priority threads will be run (since there are 4 cores some normal priority threads will
+be run as well). The priority test can be run with the command:
+
+
+Welcome. This is YAMS virtual terminal.
+
+BUENOS is a University Educational Nutshell Operating System
+==========================================================
+
+Copyright (C) 2003-2006  Juha Aatrokoski, Timo Lilja,
+  Leena Salmela, Teemu Takanen, Aleksi Virtanen
+See the file COPYING for licensing details.
+
+(Inits)
+
+VFS: TFS initialized on disk at 0xb0008030
+VFS: Mounted filesystem volume [testi]
+Initializing networking
+No initial program (initprog), dropping to fallback
+starting high priority threads
+Running high priority thread
+Running high priority thread
+starting normal priority threads
+Running high priority thread
+Running high priority thread
+starting normal priority threads
+Running high priority thread
+Running high priority thread
+Running high priority thread
+Running low priority thread
+Running high priority thread
+starting normal priority threads
+Running high priority thread
+Running high priority thread
+Running low priority thread
+Running high priority thread
+Running high priority thread
+Running high priority thread
+Running high priority thread
+Running high priority thread
+Running low priority thread
+Running high priority thread
+Running high priority thread
+Running low priority thread
+Running high priority thread
+Running high priority thread
+Running high priority thread
+Running high priority thread
+Running low priority thread
+Running high priority thread
+Running high priority thread
+starting normal priority threads
+Running high priority thread
+Running high priority thread
+Running low priority thread
+Running high priority thread
+Running low priority thread
+Running high priority thread
+Running high priority thread
+Running high priority thread
+Running high priority thread
+Running high priority thread
+Running high priority thread
+Running low priority thread
+Running high priority thread
+Running high priority thread
+Running high priority thread
+Running low priority thread
+Running high priority thread
+Running high priority thread
+Running high priority thread
+Running low priority thread
+Running high priority thread
+Running high priority thread
+starting normal priority threads
+Running high priority thread
+Running high priority thread
+Running high priority thread
+Running low priority thread
+Running high priority thread
+Running high priority thread
+Running low priority thread
+Running high priority thread
+Running high priority thread
+Running high priority thread
+Running high priority thread
+Running high priority thread
+Running low priority thread
+Running high priority thread
+Running high priority thread
+Running low priority thread
+Running high priority thread
+Running high priority thread
+
+As we can see, the high priority threads are run much more frequently than the normal priority
+threads, even though there are many more normal priority threads. This implies that the priority
+system works on threads.
+
