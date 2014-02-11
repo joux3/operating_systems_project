@@ -13,7 +13,9 @@ General:
 All the test cases can be found from the kernel_tests folder. There are also slight
 modifications in the buenos/init/main.c (the file that hinted that maybe you should
 put some tests here). The desired tests are given as command line arguments when
-starting buenos, as will bee seen from the example runs below.
+starting buenos, as will be seen from the example runs below.
+
+--------
 
 Assignment 1: Locks and condition variables
 
@@ -100,6 +102,8 @@ The lock seems to be working.
 
 The condition variables are used in the implementation of the producer-consumer
 problem, so let's proceed to that.
+
+--------
 
 Assignment 2: Producer-Consumer
 
@@ -278,6 +282,8 @@ read 13 in thread 10
 Producer-consumer problem seems to work fine and that also verifies the functioning
 of the condition variables.
 
+--------
+
 Assignment 3: Thread sleep
 
 As described in the README, the sleep implemetation differed from the one depicted
@@ -291,7 +297,7 @@ It's easy to check that the time spent sleeping is greater or equal to the sleep
 asked.
 
 Note that the sleeps are also used in the testing of the phone system (detailed further in
-the following section), which stress tests the sleep as well. The sleep funcstions in both
+the following section), which stress tests the sleep as well. The sleep works in both
 cases.
 
 You can run the sleep test with the following command:
@@ -350,6 +356,8 @@ starting sleep test
 > sleeping in thread 3 for 26642, start_time 145827
 
 Sleep seems to work.
+
+--------
 
 Assignment 4: Phone system
 
@@ -523,6 +531,8 @@ it's used in two places in the system (answering threads sleep after answering t
 talking on the phone, calling threads will wait upon successful and failed calls to simulate
 talking and waiting to try again, respectively).
 
+--------
+
 Assignment 5: Priority queues
 
 We also implemented the simple thread priority (with high and normal priorities) and there is a
@@ -531,6 +541,7 @@ test file for those that as well, priority_test.c/h. The priority test is very s
 the high priority threads will be run (since there are 4 cores some normal priority threads will
 be run as well). The priority test can be run with the command:
 
+yams buenos priority_test
 
 Welcome. This is YAMS virtual terminal.
 
