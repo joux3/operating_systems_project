@@ -278,4 +278,248 @@ read 13 in thread 10
 Producer-consumer problem seems to work fine and that also verifies the functioning
 of the condition variables.
 
+Assignment 3: Thread sleep
+
+As described in the README, the sleep implemetation differed from the one depicted
+in the review session.
+
+The sleep test is located in sleep_test.c/h.
+
+The sleep test is super simple - it creates three threads that will simply sleep and
+print the times they go to sleep, they wake up and the difference between those times.
+It's easy to check that the time spent sleeping is greater or equal to the sleep time
+asked.
+
+Note that the sleeps are also used in the testing of the phone system (detailed further in
+the following section), which stress tests the sleep as well. The sleep funcstions in both
+cases.
+
+You can run the sleep test with the following command:
+
+yams buenos sleep_test
+
+And this is an example output:
+
+Welcome. This is YAMS virtual terminal.
+
+BUENOS is a University Educational Nutshell Operating System
+==========================================================
+
+Copyright (C) 2003-2006  Juha Aatrokoski, Timo Lilja,
+  Leena Salmela, Teemu Takanen, Aleksi Virtanen
+See the file COPYING for licensing details.
+
+(Initializations)
+
+VFS: TFS initialized on disk at 0xb0008030
+VFS: Mounted filesystem volume [testi]
+Initializing networking
+No initial program (initprog), dropping to fallback
+starting sleep test
+> sleeping in thread 3 for 36949, start_time 95
+> sleeping in thread 4 for 32452, start_time 97
+> sleeping in thread 1 for 43356, start_time 99
+> sleeping in thread 5 for 30814, start_time 97
+> slept in thread 5 for 30823, asked for 30814, now 30920
+> sleeping in thread 5 for 34805, start_time 30924
+> slept in thread 4 for 32456, asked for 32452, now 32553
+> sleeping in thread 4 for 30125, start_time 32557
+> slept in thread 3 for 36955, asked for 36949, now 37050
+> sleeping in thread 3 for 34729, start_time 37054
+> slept in thread 1 for 43363, asked for 43356, now 43462
+> sleeping in thread 1 for 27278, start_time 43466
+> slept in thread 4 for 30128, asked for 30125, now 62685
+> sleeping in thread 4 for 49354, start_time 62689
+> slept in thread 5 for 34808, asked for 34805, now 65732
+> sleeping in thread 5 for 46887, start_time 65736
+> slept in thread 1 for 27281, asked for 27278, now 70747
+> sleeping in thread 1 for 42191, start_time 70751
+> slept in thread 3 for 34732, asked for 34729, now 71786
+> sleeping in thread 3 for 38784, start_time 71790
+> slept in thread 3 for 38787, asked for 38784, now 110577
+> sleeping in thread 3 for 35239, start_time 110581
+> slept in thread 4 for 49357, asked for 49354, now 112046
+> sleeping in thread 4 for 45664, start_time 112050
+> slept in thread 5 for 46890, asked for 46887, now 112626
+> sleeping in thread 5 for 23702, start_time 112630
+> slept in thread 1 for 42194, asked for 42191, now 112945
+> sleeping in thread 1 for 39926, start_time 112949
+> slept in thread 5 for 23705, asked for 23702, now 136335
+> sleeping in thread 5 for 41189, start_time 136339
+> slept in thread 3 for 35242, asked for 35239, now 145823
+> sleeping in thread 3 for 26642, start_time 145827
+
+Sleep seems to work.
+
+Assignment 4: Phone system
+
+The phone system is simply tested by creating a number of threads to call the make_call function
+and a number of threads to call the phone function (referred to as calling_threads and answering
+threads in the code). There are some assertions scattered in the code that make sure that the
+values are kept sensible.
+
+The phone system can be run with the following command:
+
+yams buenos phone_system
+
+And here's an example run:
+
+Welcome. This is YAMS virtual terminal.
+
+BUENOS is a University Educational Nutshell Operating System
+==========================================================
+
+Copyright (C) 2003-2006  Juha Aatrokoski, Timo Lilja,
+  Leena Salmela, Teemu Takanen, Aleksi Virtanen
+See the file COPYING for licensing details.
+
+(Initializations)
+
+VFS: TFS initialized on disk at 0xb0008030
+VFS: Mounted filesystem volume [testi]
+Initializing networking
+No initial program (initprog), dropping to fallback
+starting phone system demo
+starting 3 answering threads
+answering thread 3 ready to answer
+answering thread 4 ready to answer
+answering thread 5 ready to answer
+starting 10 calling threads
+calling thread 6 making a call
+calling thread 7 making a call
+calling thread 8 making a call
+calling thread 9 making a call
+calling thread 6 succeeded in making a call
+calling thread 10 making a call
+answering thread 5 starts talking
+calling thread 7 succeeded in making a call
+answering thread 4 starts talking
+calling thread 12 making a call
+calling thread 11 making a call
+calling thread 9 succeeded in making a call
+answering thread 3 starts talking
+calling thread 13 making a call
+calling thread 12 succeeded in making a call
+calling thread 10 failed at making a call, lines full
+calling thread 14 making a call
+calling thread 11 failed at making a call, lines full
+calling thread 13 failed at making a call, lines full
+calling thread 14 failed at making a call, lines full
+calling thread 8 succeeded in making a call
+calling thread 15 making a call
+calling thread 15 failed at making a call, lines full
+calling thread 6 making a call
+calling thread 7 making a call
+answering thread 5 finished answering
+answering thread 4 finished answering
+calling thread 7 succeeded in making a call
+answering thread 5 ready to answer
+calling thread 9 making a call
+answering thread 4 ready to answer
+answering thread 5 starts talking
+answering thread 3 finished answering
+calling thread 12 making a call
+calling thread 9 succeeded in making a call
+calling thread 6 succeeded in making a call
+answering thread 4 starts talking
+answering thread 3 ready to answer
+calling thread 12 failed at making a call, lines full
+calling thread 8 making a call
+answering thread 3 starts talking
+calling thread 8 failed at making a call, lines full
+calling thread 7 making a call
+calling thread 7 failed at making a call, lines full
+answering thread 5 finished answering
+answering thread 5 ready to answer
+calling thread 9 making a call
+answering thread 5 starts talking
+calling thread 6 making a call
+calling thread 9 succeeded in making a call
+calling thread 6 failed at making a call, lines full
+answering thread 4 finished answering
+answering thread 3 finished answering
+answering thread 4 ready to answer
+answering thread 3 ready to answer
+answering thread 4 starts talking
+answering thread 3 starts talking
+answering thread 5 finished answering
+calling thread 9 making a call
+answering thread 5 ready to answer
+calling thread 9 succeeded in making a call
+answering thread 5 starts talking
+answering thread 4 finished answering
+answering thread 3 finished answering
+answering thread 4 ready to answer
+answering thread 3 ready to answer
+calling thread 9 making a call
+answering thread 5 finished answering
+calling thread 9 succeeded in making a call
+answering thread 4 starts talking
+answering thread 5 ready to answer
+calling thread 10 making a call
+calling thread 10 succeeded in making a call
+calling thread 11 making a call
+answering thread 3 starts talking
+calling thread 13 making a call
+calling thread 14 making a call
+answering thread 5 starts talking
+calling thread 11 succeeded in making a call
+calling thread 13 succeeded in making a call
+calling thread 15 making a call
+calling thread 14 succeeded in making a call
+calling thread 15 failed at making a call, lines full
+calling thread 9 making a call
+answering thread 4 finished answering
+calling thread 9 succeeded in making a call
+answering thread 4 ready to answer
+answering thread 4 starts talking
+calling thread 10 making a call
+answering thread 3 finished answering
+calling thread 10 succeeded in making a call
+answering thread 3 ready to answer
+answering thread 5 finished answering
+answering thread 3 starts talking
+answering thread 5 ready to answer
+calling thread 12 making a call
+calling thread 11 making a call
+answering thread 5 starts talking
+calling thread 8 making a call
+calling thread 14 making a call
+calling thread 12 succeeded in making a call
+calling thread 13 making a call
+calling thread 11 failed at making a call, lines full
+calling thread 14 failed at making a call, lines full
+calling thread 13 failed at making a call, lines full
+calling thread 8 failed at making a call, lines full
+calling thread 9 making a call
+calling thread 9 failed at making a call, lines full
+answering thread 4 finished answering
+answering thread 4 ready to answer
+answering thread 4 starts talking
+calling thread 7 making a call
+calling thread 7 succeeded in making a call
+calling thread 10 making a call
+calling thread 10 failed at making a call, lines full
+answering thread 3 finished answering
+calling thread 6 making a call
+answering thread 3 ready to answer
+calling thread 6 succeeded in making a call
+answering thread 3 starts talking
+calling thread 12 making a call
+answering thread 5 finished answering
+calling thread 12 succeeded in making a call
+answering thread 5 ready to answer
+answering thread 5 starts talking
+answering thread 4 finished answering
+answering thread 4 ready to answer
+answering thread 4 starts talking
+calling thread 7 making a call
+calling thread 7 succeeded in making a call
+calling thread 6 making a call
+
+As we can read, excessive call are rejected, only the desired number (3) of calls gets answered
+and the system doesn't deadlock. This also further verifies that the thread sleep works, since
+it's used in two places in the system (answering threads sleep after answering to simulate
+talking on the phone, calling threads will wait upon successful and failed calls to simulate
+talking and waiting to try again, respectively).
 
