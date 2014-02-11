@@ -14,9 +14,7 @@ Assignment 1
     -lock_cond.h/c (new files containing the lock and condition
     variable implementations)
     -kernel/module.mk (added appropriate files to be compiled)
-    -scheluder.c/h (thread priority, thread sleep)
     -synch.h (added locks and condition variables)
-    -thread.c/h (thead sleep and priority)
     -added the kernel_tests folder that contains the tests that
     are run in the kernel mode (more on this on the tests)
 
@@ -104,7 +102,7 @@ Assignment 1
 Assignment 2
 
 1. Changed files:
-    - config.h (the max amount of locks or )
+	kerneltests/buffer_test.c/h
 
 2. Description of the solution
 	globals:
@@ -186,9 +184,10 @@ Assignment 3
 Assignment 4
 
 1. Changed files:
+	kernel_test/phone_system.c/h
 
 2. Description of the solution
-	globals:
+	shared:
 		int free_lines
 		semaphore_t sem_lines
 		semaphore_t sem_phones
@@ -202,19 +201,51 @@ Assignment 4
 			 -decrement sem_lines by 1 and return 0
 	
 	phone:
+		-decrement semaphore sem_phones
+		- ... talk on the phone ...
+		-decrement semaphore sem_lines
+		-increment free_lines
+		-increment semaphore sem_lines
 	
-	calling_thread:
-
-	answering_thread:
-				
-		
-
 3. Motivation behind the solution
+	-sem_phones semaphore allows the phones talk simultaneosly
+	-sem_lines is used like a lock to guard the global free_lines
 
 4. Changes made to the plan presented in the review session
+	-NONE
 
 --------
 
 Assignment 5
 
-Changed files:
+1. Changed files:
+	-scheduler.c/h
+	-thread.c/h
+
+2. Description of solution:
+	scheduler:
+		-added linked list high_priority_thread_ready_to run for high priority threads
+		scheduler_add_to_ready_list:
+			-changed logic so that thread is added to appropriate list according to priority	
+		scheduler_remove_first_ready:
+			-changed logic so that we first check if there is any high priority threads and choose one of them to run and remove it from list
+			-if no high priority threads then a normal priority thread is selected and removed from list
+	
+	thread:
+		thread_t:
+			-added member priority
+
+		thread_create:
+			-calls_thread_create_priority with priority NORMAL
+
+		thread_create_priority:
+			-a modification for thread_create that takes an addition paramater describing thread priority
+			-creates a thread with the desired priority
+		
+
+3. Motivation behind the solution
+	-Since only one additional priority level was desired we used the simplest solution and just made additional handling for that level
+	-More scalable solutions could have been made with f.ex. priority queues but they would have resulted to much code rewrite
+
+4. Changes made to the plan presented in the review session
+	-NONE
