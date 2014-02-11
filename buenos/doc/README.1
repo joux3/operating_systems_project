@@ -105,7 +105,7 @@ Assignment 2
 	kerneltests/buffer_test.c/h
 
 2. Description of the solution
-	globals:
+	shared:
 		lock for the queue and two condition variables (notfull, notempty)
 		buffer, implemented as circular buffer
 	
@@ -122,8 +122,8 @@ Assignment 2
 		-release lock
 
 3. Motivation behind the solution
-	-Need a lock to guard the global resource (buffer)
-	-Two condition variables are used since there are two separate conditions where the program is not able to run until they are solved:
+	-need a lock to guard the global resource (buffer)
+	-two condition variables are used since there are two separate conditions where the program is not able to run until they are solved:
 		-buffer is empty
 		-buffer is full
 
@@ -172,8 +172,8 @@ Assignment 3
 				
 
 3. Motivation behind the solution
-	-Desire to make an implementation that is not too heavy on the scheduler
-	-Try to make as little changes to the scheduler logic as possible
+	-desire to make an implementation that is not too heavy on the scheduler
+	-try to make as little changes to the scheduler logic as possible
 
 4. Changes made to the plan presented in the review session
 	-instead of going through the ready_to_run list and skipping sleeping threads we implemented the scheduler_sleeping_for_time linked list
@@ -239,13 +239,13 @@ Assignment 5
 			-calls_thread_create_priority with priority NORMAL
 
 		thread_create_priority:
-			-a modification for thread_create that takes an addition paramater describing thread priority
+			-a modification for thread_create that takes an additional paramater describing thread priority
 			-creates a thread with the desired priority
 		
 
 3. Motivation behind the solution
-	-Since only one additional priority level was desired we used the simplest solution and just made additional handling for that level
-	-More scalable solutions could have been made with f.ex. priority queues but they would have resulted to much code rewrite
+	-since only one additional priority level was desired we used the simplest solution and just made additional handling for that level
+	-more scalable solutions could have been made with f.ex. priority queues but they would have resulted to much code rewrite
 
 4. Changes made to the plan presented in the review session
 	-NONE
