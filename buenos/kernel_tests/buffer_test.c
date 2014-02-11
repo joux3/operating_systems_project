@@ -5,6 +5,8 @@
 #include "lib/debug.h"
 
 #define N 128
+#define PRODUCERS 5
+#define CONSUMERS 10
 static uint8_t buffer[N];
 static int start = 0;
 static int end = 0;
@@ -70,14 +72,16 @@ void buffer_test_main(void) {
     notempty = condition_create();
     kprintf("notfull %d, notempty %d\n", notfull, notempty);
 
-    for (i = 0; i < 10; i++) {
+    for (i = 0; i < CONSUMERS; i++) {
         TID_t thread;
         thread = thread_create(&consume_thread, 0);
         thread_run(thread);
     }
-    TID_t thread;
-    thread = thread_create(&produce_thread, 999);
-    thread_run(thread);
+    for (i = 0; i < PRODUCERS; i++) {
+        TID_t thread;
+        thread = thread_create(&produce_thread, 999);
+        thread_run(thread);
+    }
 
     while(1) {}
 }

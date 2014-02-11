@@ -7,3 +7,275 @@ Members
   Olli-Matti Saario
 
 --------
+
+General:
+
+All the test cases can be found from the kernel_tests folder. There are also slight
+modifications in the buenos/init/main.c (the file that hinted that maybe you should
+put some tests here). The desired tests are given as command line arguments when
+starting buenos, as will bee seen from the example runs below.
+
+Assignment 1: Locks and condition variables
+
+The test file lock_cond.c/h contains tests for the lock implementation. It creates
+a single lock that is then accessed by three threads. The threads simply grab the
+lock, try thread switching a bunch of times and proceed to free it, printing their
+progress. Since the threads print their progress just after acquiring the lock and
+just before releasing it, if the prints of the threads don't overlap, the lock is
+keeping their execution separate. We could consider the the part of code between
+acquiring and releasing the lock as the critical section.
+
+You can run the test with the following command:
+
+yams buenos lock_test
+
+And here is a test run:
+
+Welcome. This is YAMS virtual terminal.
+
+BUENOS is a University Educational Nutshell Operating System
+==========================================================
+
+Copyright (C) 2003-2006  Juha Aatrokoski, Timo Lilja,
+  Leena Salmela, Teemu Takanen, Aleksi Virtanen
+See the file COPYING for licensing details.
+
+(Initialization stuff)
+
+Mounting filesystems
+VFS: TFS initialized on disk at 0xb0008030
+VFS: Mounted filesystem volume [testi]
+Initializing networking
+No initial program (initprog), dropping to fallback
+starting lock test
+stared thread 0
+stared thread 1
+stared thread 2
+locked in thread 1
+freeing in thread 1
+locked in thread 0
+freeing in thread 0
+locked in thread 2
+freeing in thread 2
+locked in thread 1
+freeing in thread 1
+locked in thread 0
+freeing in thread 0
+locked in thread 2
+freeing in thread 2
+locked in thread 1
+freeing in thread 1
+locked in thread 0
+freeing in thread 0
+locked in thread 2
+freeing in thread 2
+locked in thread 1
+freeing in thread 1
+locked in thread 0
+freeing in thread 0
+locked in thread 2
+freeing in thread 2
+locked in thread 1
+freeing in thread 1
+locked in thread 0
+freeing in thread 0
+locked in thread 2
+freeing in thread 2
+locked in thread 1
+freeing in thread 1
+locked in thread 0
+freeing in thread 0
+locked in thread 2
+freeing in thread 2
+locked in thread 1
+freeing in thread 1
+locked in thread 0
+freeing in thread 0
+locked in thread 2
+freeing in thread 2
+locked in thread 1
+freeing in thread 1
+
+The lock seems to be working.
+
+The condition variables are used in the implementation of the producer-consumer
+problem, so let's proceed to that.
+
+Assignment 2: Producer-Consumer
+
+The implementation of the producer-producer consumer toy problem also acts as the test
+for condition variables. The implementation resides in the buffer_test.c/h file.
+
+As per the assignment requirements, the buffer test implements a bounded buffer
+that is used as the basis of the producer consumer example. The test code is pretty simple -
+there are producer threads that put things to the buffer and consumer threads that take
+things from the buffer. The getting and putting are protected with condition variables (that
+tell whether the buffer is empty or full or neither). Since the system doesn't deadlock and
+we can read from the output that the elements are written and read in the correct order, we can
+conclude that both the condition variables and the bounded buffer work as expected.
+
+You can vary the amount of producers and consumers in the beginning of the test file.
+
+You can run the producer-consumer/buffer test with the following command:
+
+yams buenos buffer_test
+
+Here's an example run (5 producers, 10 consumers):
+
+Welcome. This is YAMS virtual terminal.
+
+BUENOS is a University Educational Nutshell Operating System
+==========================================================
+
+Copyright (C) 2003-2006  Juha Aatrokoski, Timo Lilja,
+  Leena Salmela, Teemu Takanen, Aleksi Virtanen
+See the file COPYING for licensing details.
+
+(Initialization messages)
+
+VFS: TFS initialized on disk at 0xb0008030
+VFS: Mounted filesystem volume [testi]
+Initializing networking
+No initial program (initprog), dropping to fallback
+In kernel buffer test
+notfull -2147229624, notempty -2147229620
+writing 1 in thread 13
+writing 1 in thread 14
+writing 1 in thread 15
+writing 1 in thread 16
+writing 1 in thread 17
+writing 2 in thread 14
+writing 2 in thread 15
+writing 2 in thread 16
+writing 2 in thread 17
+writing 2 in thread 13
+read 1 in thread 3
+writing 3 in thread 14
+read 1 in thread 4
+writing 3 in thread 15
+read 1 in thread 6
+writing 3 in thread 16
+read 1 in thread 5
+read 1 in thread 7
+writing 3 in thread 17
+read 2 in thread 3
+read 2 in thread 8
+writing 3 in thread 13
+writing 4 in thread 14
+read 2 in thread 4
+read 2 in thread 9
+writing 4 in thread 15
+read 2 in thread 6
+read 3 in thread 10
+writing 4 in thread 16
+read 3 in thread 5
+read 3 in thread 7
+read 3 in thread 3
+writing 4 in thread 17
+writing 4 in thread 13
+read 3 in thread 4
+writing 5 in thread 14
+writing 5 in thread 15
+read 4 in thread 9
+read 4 in thread 6
+read 4 in thread 7
+writing 5 in thread 16
+writing 5 in thread 17
+read 4 in thread 8
+writing 5 in thread 13
+read 4 in thread 4
+writing 6 in thread 14
+read 5 in thread 12
+writing 6 in thread 15
+read 5 in thread 9
+read 5 in thread 10
+writing 6 in thread 16
+read 5 in thread 8
+writing 6 in thread 17
+writing 6 in thread 13
+read 5 in thread 4
+writing 7 in thread 15
+writing 7 in thread 14
+read 6 in thread 9
+read 6 in thread 6
+read 6 in thread 7
+writing 7 in thread 16
+writing 7 in thread 17
+read 6 in thread 5
+read 6 in thread 4
+writing 7 in thread 13
+writing 8 in thread 14
+read 7 in thread 9
+read 7 in thread 6
+writing 8 in thread 15
+writing 8 in thread 16
+writing 8 in thread 17
+read 7 in thread 8
+read 7 in thread 5
+read 7 in thread 11
+writing 8 in thread 13
+read 8 in thread 9
+writing 9 in thread 14
+read 8 in thread 7
+writing 9 in thread 15
+writing 9 in thread 16
+read 8 in thread 10
+writing 9 in thread 17
+read 8 in thread 8
+writing 9 in thread 13
+read 8 in thread 4
+writing 10 in thread 14
+read 9 in thread 9
+writing 10 in thread 15
+read 9 in thread 7
+writing 10 in thread 17
+writing 10 in thread 16
+read 9 in thread 5
+read 9 in thread 8
+read 9 in thread 3
+writing 10 in thread 13
+read 10 in thread 9
+writing 11 in thread 14
+read 10 in thread 7
+writing 11 in thread 15
+writing 11 in thread 17
+read 10 in thread 5
+read 10 in thread 6
+writing 11 in thread 16
+writing 11 in thread 13
+read 10 in thread 9
+read 11 in thread 4
+writing 12 in thread 14
+read 11 in thread 11
+writing 12 in thread 15
+writing 12 in thread 17
+read 11 in thread 12
+writing 12 in thread 16
+read 11 in thread 9
+writing 12 in thread 13
+read 11 in thread 8
+writing 13 in thread 14
+read 12 in thread 4
+writing 13 in thread 15
+read 12 in thread 7
+writing 13 in thread 17
+read 12 in thread 12
+writing 13 in thread 13
+read 12 in thread 8
+writing 13 in thread 16
+read 12 in thread 10
+writing 14 in thread 14
+read 13 in thread 3
+writing 14 in thread 15
+read 13 in thread 7
+writing 14 in thread 17
+read 13 in thread 12
+writing 14 in thread 13
+read 13 in thread 8
+writing 14 in thread 16
+read 13 in thread 10
+
+Producer-consumer problem seems to work fine and that also verifies the functioning
+of the condition variables.
+
+
