@@ -11,242 +11,257 @@ Members
 Assignment 1
 1. Changed files
 
-    -lock_cond.h/c (new files containing the lock and condition
-    variable implementations)
-    -kernel/module.mk (added appropriate files to be compiled)
-    -kernel/synch.h (added locks and condition variables)
-    -init/main.c (call initialization code for locks and condition variables)
-    -added the kernel_tests folder that contains the tests that
-    are run in the kernel mode (more on this on the tests)
+    - lock_cond.h/c (new files containing the lock and condition
+      variable implementations)
+    - kernel/module.mk (added appropriate files to be compiled)
+    - kernel/synch.h (added locks and condition variables)
+    - init/main.c (call initialization code for locks and condition variables)
+    - added the kernel_tests folder that contains the tests that
+      are run in the kernel mode (more on this on the tests)
 
 2. Description of the solution
 
 
-	lock:
-		-lock_t type and lock_table as fixed size array of lock_t
+  lock:
+    - lock_t type and lock_table as fixed size array of lock_t
 
-		lock_t:
-			int thread_count:
-				-how many threads are waiting on the lock
-			int created:
-				- 1 if lock is in use 0 otherwise
-			int spinlock:
-				-spinlock for lock
+    lock_t:
+      int thread_count:
+        - how many threads are waiting on the lock
+      int created:
+        - 1 if lock is in use 0 otherwise
+      int spinlock:
+        - spinlock for lock
 
-		create:
-			-disable interrupts and spinlock lock_table
-			-find free lock (created 0) from table, set created to 1 and return pointer to the lock or NULL 			if no free locks
-			-spinlock release and interrupts enabled
+    create:
+      - disable interrupts and spinlock lock_table
+      - find free lock (created 0) from table, set created to 1 and return pointer to the lock 
+        or NULL if no free locks
+      - spinlock release and interrupts enabled
 
-		destroy:
-			-set locks created value to 0
+    destroy:
+      - set locks created value to 0
 
-		acquire:
-			-disable interrupts and acquire the spinlock of the lock 
-			-add 1 to threadcount
-			-if lock is owned by other thread (threadcount > 1) add current thread to sleep queue for the lock and switch thread
-			-if lock is free continue with current thread
-			-spinlock release and interrupts enabled
-	
-		release:
-			-disable interrupts and acquire the spinlock of the lock 
-			-lower threadcount by 1
-			-if there are thread waiting for lock (threadcount > 0) call wake the threads (sleepq_wake)
-			-spinlock release and interrupts enabled
+    acquire:
+      - disable interrupts and acquire the spinlock of the lock 
+      - add 1 to threadcount
+      - if lock is owned by other thread (threadcount > 1) add current thread to sleep queue for
+        the lock and switch thread
+      - if lock is free continue with current thread
+      - spinlock release and interrupts enabled
+  
+    release:
+      - disable interrupts and acquire the spinlock of the lock 
+      - lower threadcount by 1
+      - if there are thread waiting for lock (threadcount > 0) call wake the threads (sleepq_wake)
+      - spinlock release and interrupts enabled
 
-	condition variable:
-		-cond_t type and cond_table as fixed size array of cond_t
+  condition variable:
+    - cond_t type and cond_table as fixed size array of cond_t
 
-		cond_t:
-			int created:
-				- 1 if cond is in use 0 otherwise
-			int spinlock:
-				-spinlock for cond
-		create:
-			-disable interrupts and spinlock lock_table
-			-find free cond (created 0) from table, set created to 1 and return pointer to the cond or NULL if no free cond
-			-spinlock release and interrupts enabled
+    cond_t:
+      int created:
+        - 1 if cond is in use 0 otherwise
+      int spinlock:
+        - spinlock for cond
+    create:
+      - disable interrupts and spinlock lock_table
+      - find free cond (created 0) from table, set created to 1 and return pointer to the cond or 
+        NULL if no free cond
+      - spinlock release and interrupts enabled
 
-		destroy:
-			-set cond created value to 0
+    destroy:
+      - set cond created value to 0
 
-		wait:
-			-disable interrupts and spinlock conds lock 
-			-add current thread to sleepqueue for the cond and switch threads
-			-release the lock given as parameter
-			-spinlock release and interrupts enabled
-	
-		signal:
-			-call sleepqueue wake for cond	
+    wait:
+      - disable interrupts and spinlock conds lock 
+      - add current thread to sleepqueue for the cond and switch threads
+      - release the lock given as parameter
+      - spinlock release and interrupts enabled
+  
+    signal:
+      - call sleepqueue wake for cond  
 
-		broadcast:
-			-call sleepqueue broadcast for cond	
+    broadcast:
+      - call sleepqueue broadcast for cond  
 
-	initialization:
-		-resets spinlocks for both lock and cond tables
-		-set all locks and conds as free (created 0)
-		
+  initialization:
+    - resets spinlocks for both lock and cond tables
+    - set all locks and conds as free (created 0)
+    
 
 3. Motivation behind the solution
-	lock:
-		- Lock is very similiar to a semaphore so we decided to implement it in a similiar manner as the semaphore is implemented
-		- Using the thread_count member to calculate the current amount of threads waiting for the lock seemed like an intuitive and logical implementation
-	
-	condition variable:
-		-given the interfaces for sleep queue and for our implementation of the lock condition variable was easy to implement in a simple manner	
+  lock:
+    - Lock is very similiar to a semaphore so we decided to implement it in a similiar manner as
+      the semaphore is implemented
+    - Using the thread_count member to calculate the current amount of threads waiting for the
+      lock seemed like an intuitive and logical implementation
+  
+  condition variable:
+    - given the interfaces for sleep queue and for our implementation of the lock condition
+      variable was easy to implement in a simple manner  
 
 4. Changes made to the plan presented in the review session
-	-spinlocking and interrupt disabling removed from cond signal and broadcast 
+  - spinlocking and interrupt disabling removed from cond signal and broadcast 
 
 --------
 
 Assignment 2
 
 1. Changed files:
-	kernel_tests/buffer_test.c/h
+  kernel_tests/buffer_test.c/h
 
 2. Description of the solution
-	shared:
-		lock for the queue and two condition variables (notfull, notempty)
-		buffer, implemented as circular buffer
-	
-	buffer_put:
-		-acquire lock
-		-while buffer is full wait for cond notfull
-		-put the data to buffer		
-		-release lock
+  shared:
+    lock for the queue and two condition variables (notfull, notempty)
+    buffer, implemented as circular buffer
+  
+  buffer_put:
+    - acquire lock
+    - while buffer is full wait for cond notfull
+    - put the data to buffer    
+    - release lock
 
-	buffer_get:
-		-acquire lock
-		-while buffer is empty wait for cond notempty
-		-get data from buffer		
-		-release lock
+  buffer_get:
+    - acquire lock
+    - while buffer is empty wait for cond notempty
+    - get data from buffer    
+    - release lock
 
 3. Motivation behind the solution
-	-need a lock to guard the global resource (buffer)
-	-two condition variables are used since there are two separate conditions where the program is not able to run until they are solved:
-		-buffer is empty
-		-buffer is full
+  - need a lock to guard the global resource (buffer)
+  - two condition variables are used since there are two separate conditions where the program
+    is not able to run until they are solved:
+    - buffer is empty
+    - buffer is full
 
 4. Changes made to the plan presented in the review session
-	-NONE
+  - NONE
 
 --------
 
 Assignment 3
 
 1. Changed files:
-	-kernel/scheduler.c/h
-	-kernel/thread.c/h
+  - kernel/scheduler.c/h
+  - kernel/thread.c/h
 
 2. Description of the solution
 
-	thread:
+  thread:
 
-		thread_t:
-			-added int sleeps_until member to thread_t which represents the time when thread is supposed to wake up again   
-	
-		thread_sleep
-			-disable interrupts and spinlock thread spinlock
-			-set threads sleep_until to current_time +  desired sleep_time given as parameter
-	
-	scheduler:
-		
-		-added scheduler_sleeping_for_time linked list to represent sleeping threads	
-		
-		scheduler_add_to_ready_list:
-			-set threads sleeps_until value to 0	
-		
-		scheduler_remove_first_ready:
-			-asserts added to check that the ready thread that is to be run has sleeps_until value 0
+    thread_t:
+      - added int sleeps_until member to thread_t which represents the time when thread is
+        supposed to wake up again
+  
+    thread_sleep
+      - disable interrupts and spinlock thread spinlock
+      - set threads sleep_until to current_time +  desired sleep_time given as parameter
+  
+  scheduler:
+    
+    - added scheduler_sleeping_for_time linked list to represent sleeping threads  
+    
+    scheduler_add_to_ready_list:
+      - set threads sleeps_until value to 0  
+    
+    scheduler_remove_first_ready:
+      - asserts added to check that the ready thread that is to be run has sleeps_until value 0
 
-		move_sleeping_threads_to_ready:
-			-for each thread in sleeping list (scheduler_sleeping_for_time) wakes thread up if current time is > threads sleeps_until
+    move_sleeping_threads_to_ready:
+      - for each thread in sleeping list (scheduler_sleeping_for_time) wakes thread up if
+        current time is > threads sleeps_until
 
-		scheduler_add_to_sleeping_list:
-			-adds a thread to scheduler_sleeping_for_time list
+    scheduler_add_to_sleeping_list:
+      - adds a thread to scheduler_sleeping_for_time list
 
-		scheduler_schedule:
-			added mainentance needed for thread sleep functionality to work:
-				-if current threads sleeps_until > 0 call scheduler_add_to_sleeping_list for current thread
-				-call move_sleeping_sleeping_threads_to_ready on scheduler tick	
-				
+    scheduler_schedule:
+      added mainentance needed for thread sleep functionality to work:
+        - if current threads sleeps_until > 0 call scheduler_add_to_sleeping_list for current thread
+        - call move_sleeping_sleeping_threads_to_ready on scheduler tick  
+        
 
 3. Motivation behind the solution
-	-desire to make an implementation that is not too heavy on the scheduler
-	-try to make as little changes to the scheduler logic as possible
+  - desire to make an implementation that is not too heavy on the scheduler
+  - try to make as little changes to the scheduler logic as possible
 
 4. Changes made to the plan presented in the review session
-	-instead of going through the ready_to_run list and skipping sleeping threads we implemented the scheduler_sleeping_for_time linked list
-	-the original solution would have lead to too much rewrite of code for the scheduling
+  - instead of going through the ready_to_run list and skipping sleeping threads we 
+    implemented the scheduler_sleeping_for_time linked list
+  - the original solution would have lead to too much rewrite of code for the scheduling
 
 --------
 
 Assignment 4
 
 1. Changed files:
-	kernel_test/phone_system.c/h
+  kernel_test/phone_system.c/h
 
 2. Description of the solution
-	shared:
-		int free_lines
-		semaphore_t sem_lines
-		semaphore_t sem_phones
+  shared:
+    int free_lines
+    semaphore_t sem_lines
+    semaphore_t sem_phones
 
-	make_call:
-		-decrement sem_lines by 1 (basically used just as a lock)
-		if there are free_lines:
-			- take one and increment value by 1
-			- increment sem_lines and sem_phones by 1
-		else:
-			 -decrement sem_lines by 1 and return 0
-	
-	phone:
-		-decrement semaphore sem_phones
-		- ... talk on the phone ...
-		-decrement semaphore sem_lines
-		-increment free_lines
-		-increment semaphore sem_lines
-	
+  make_call:
+    - decrement sem_lines by 1 (basically used just as a lock)
+    if there are free_lines:
+      - take one and increment value by 1
+      - increment sem_lines and sem_phones by 1
+    else:
+      - decrement sem_lines by 1 and return 0
+  
+  phone:
+    - decrement semaphore sem_phones
+    - ... talk on the phone ...
+    - decrement semaphore sem_lines
+    - increment free_lines
+    - increment semaphore sem_lines
+  
 3. Motivation behind the solution
-	-sem_phones semaphore allows the phones talk simultaneosly
-	-sem_lines is used like a lock to guard the global free_lines
+  - sem_phones semaphore allows the phones talk simultaneosly
+  - sem_lines is used like a lock to guard the global free_lines
 
 4. Changes made to the plan presented in the review session
-	-NONE
+  - NONE
 
 --------
 
 Assignment 5
 
 1. Changed files:
-	-kernel/scheduler.c/h
-	-kernel/thread.c/h
+  - kernel/scheduler.c/h
+  - kernel/thread.c/h
 
 2. Description of solution:
-	scheduler:
-		-added linked list high_priority_thread_ready_to run for high priority threads
-		scheduler_add_to_ready_list:
-			-changed logic so that thread is added to appropriate list according to priority	
-		scheduler_remove_first_ready:
-			-changed logic so that we first check if there is any high priority threads and choose one of them to run and remove it from list
-			-if no high priority threads then a normal priority thread is selected and removed from list
-	
-	thread:
-		thread_t:
-			-added member priority
+  scheduler:
+    - added linked list high_priority_thread_ready_to run for high priority threads
+    scheduler_add_to_ready_list:
+      - changed logic so that thread is added to appropriate list according to priority  
+    scheduler_remove_first_ready:
+      - changed logic so that we first check if there is any high priority threads and choose
+        one of them to run and remove it from list
+      - if no high priority threads then a normal priority thread is selected and removed from list
+      - if no normal priority thread is found, then idle thread is returned
+  
+  thread:
+    thread_t:
+      - added member priority
 
-		thread_create:
-			-calls_thread_create_priority with priority NORMAL
+    thread_create:
+      - calls_thread_create_priority with priority NORMAL
 
-		thread_create_priority:
-			-a modification for thread_create that takes an additional paramater describing thread priority
-			-creates a thread with the desired priority
-		
+    thread_create_priority:
+      - a modification for thread_create that takes an additional paramater describing thread
+        priority
+      - creates a thread with the desired priority
+    
 
 3. Motivation behind the solution
-	-since only one additional priority level was desired we used the simplest solution and just made additional handling for that level
-	-more scalable solutions could have been made with f.ex. priority queues but they would have resulted in much code rewrite
+  - since only one additional priority level was desired we used the simplest solution and just
+    made additional handling for that level
+  - more scalable solutions could have been made with f.ex. priority queues but they would have
+    resulted in much code rewrite
 
 4. Changes made to the plan presented in the review session
-	-NONE
+  - NONE
