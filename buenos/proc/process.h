@@ -37,7 +37,46 @@
 #ifndef BUENOS_PROC_PROCESS
 #define BUENOS_PROC_PROCESS
 
+#ifdef CHANGED_2
+    #include "kernel/lock_cond.h"
+    #include "lib/types.h"
+    #include "kernel/config.h"
+
+    // TODO: figure out a way to skip this duplication
+    typedef int openfile_t;
+#endif
+
 typedef int process_id_t;
+
+#ifdef CHANGED_2
+
+typedef enum {
+    PROCESS_FREE,
+    PROCESS_RUNNING,
+    PROCESS_ZOMBIE
+} process_state_t;
+
+typedef struct {
+    char name[32];
+    process_state_t state; 
+    process_id_t parent;
+    uint32_t retval;
+} process_t;
+
+process_t process_table[CONFIG_MAX_PROCESS_COUNT];
+lock_t *process_table_lock;
+cond_t *process_zombie_cv;
+
+typedef struct {
+    uint32_t free;
+    process_id_t owner;
+    openfile_t vfs_handle; 
+} process_filehandle_t;
+
+process_filehandle_t process_filehandle_table[CONFIG_MAX_OPEN_FILES];
+lock_t *process_filehandle_lock;
+
+#endif
 
 void process_start(const char *executable);
 
