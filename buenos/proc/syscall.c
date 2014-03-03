@@ -50,6 +50,10 @@ gcd_t *syscall_get_console_gcd(void) {
     return (gcd_t*)device_get(YAMS_TYPECODE_TTY, 0)->generic_device;
 }
 
+process_id_t syscall_get_current_process(void) {
+    return thread_get_current_thread_entry()->process_id;
+}
+
 #endif
 
 /**
@@ -74,7 +78,10 @@ void syscall_handle(context_t *user_context)
         int result;
         char *filename;
         int size;
+        int process_filehandle;
         int filehandle;
+        int i;
+        openfile_t openfile;
         gcd_t *console;
         result = -1;
     #endif
@@ -94,7 +101,31 @@ void syscall_handle(context_t *user_context)
             KERNEL_PANIC("Unhandled system call\n");
             break;
         case SYSCALL_OPEN:
-            KERNEL_PANIC("Unhandled system call\n");
+            // TODO safely copy filename to kernel
+            filename = (char*)(user_context->cpu_regs[MIPS_REGISTER_A1]);
+            lock_acquire(process_filehandle_lock);
+            process_filehandle = -1;
+            for (i = 0; i < CONFIG_MAX_OPEN_FILES; i++) {
+                if (!process_filehandle_table[i].in_use) {
+                    process_filehandle = i;
+                    break;
+                }
+            } 
+            if (process_filehandle >= 0) {
+                openfile = vfs_open(filename);
+                if (openfile >= 0) {
+                    process_filehandle_table[i].in_use = 1;
+                    process_filehandle_table[i].vfs_handle = openfile;
+                    process_filehandle_table[i].owner = syscall_get_current_process();
+                } else {
+                    process_filehandle = -1;
+                }
+            } 
+            if (process_filehandle >= 0) {
+                process_filehandle += 3;
+            }
+            result = process_filehandle;
+            lock_release(process_filehandle_lock);
             break;
         case SYSCALL_CLOSE:
             KERNEL_PANIC("Unhandled system call\n");
@@ -108,13 +139,14 @@ void syscall_handle(context_t *user_context)
                 result = -1;
                 break;
             }
-            // TODO also handle files
-            // TODO read into kernel buffer
             if (filehandle == FILEHANDLE_STDIN) {
                 console = syscall_get_console_gcd();
                 result = console->read(console, (void*)(user_context->cpu_regs[MIPS_REGISTER_A2]), (int)(user_context->cpu_regs[MIPS_REGISTER_A3]));
             } else {
-                KERNEL_PANIC("Files not supported in syscall_read yet\n");
+                process_filehandle_t *handle_entry = &process_filehandle_table[filehandle - 3];
+                if (!handle_entry->in_use || handle_entry->owner == syscall_get_current_process()) {
+                    result = vfs_read(handle_entry->vfs_handle, (void*)(user_context->cpu_regs[MIPS_REGISTER_A2]), (int)(user_context->cpu_regs[MIPS_REGISTER_A3]));
+                }
             }
             // TODO safely copy from kernel buffer to userland
             break;
