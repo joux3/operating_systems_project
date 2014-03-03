@@ -41,6 +41,7 @@
 #include "kernel/assert.h"
 #ifdef CHANGED_2
     #include "fs/vfs.h"
+    #include "lib/debug.h"
 #endif
 
 /**
@@ -61,41 +62,51 @@ void syscall_handle(context_t *user_context)
      * returning from this function the userland context will be
      * restored from user_context.
      */
+    #ifdef CHANGED_2
+        int result;
+        char *filename;
+        int size;
+        result = -1;
+    #endif
+
     switch(user_context->cpu_regs[MIPS_REGISTER_A0]) {
     case SYSCALL_HALT:
         halt_kernel();
         break;
     #ifdef CHANGED_2
-    case SYSCALL_EXEC:
-        KERNEL_PANIC("Unhandled system call\n");
-        break;
-    case SYSCALL_EXIT:
-        KERNEL_PANIC("Unhandled system call\n");
-        break;
-    case SYSCALL_JOIN:
-        KERNEL_PANIC("Unhandled system call\n");
-        break;
-    case SYSCALL_OPEN:
-        KERNEL_PANIC("Unhandled system call\n");
-        break;
-    case SYSCALL_CLOSE:
-        KERNEL_PANIC("Unhandled system call\n");
-        break;
-    case SYSCALL_SEEK:
-        KERNEL_PANIC("Unhandled system call\n");
-        break;
-    case SYSCALL_READ:
-        KERNEL_PANIC("Unhandled system call\n");
-        break;
-    case SYSCALL_WRITE:
-        KERNEL_PANIC("Unhandled system call\n");
-        break;
-    case SYSCALL_CREATE:
-        KERNEL_PANIC("Unhandled system call\n");
-        break;
-    case SYSCALL_DELETE:
-        KERNEL_PANIC("Unhandled system call\n");
-        break;
+        case SYSCALL_EXEC:
+            KERNEL_PANIC("Unhandled system call\n");
+            break;
+        case SYSCALL_EXIT:
+            KERNEL_PANIC("Unhandled system call\n");
+            break;
+        case SYSCALL_JOIN:
+            KERNEL_PANIC("Unhandled system call\n");
+            break;
+        case SYSCALL_OPEN:
+            KERNEL_PANIC("Unhandled system call\n");
+            break;
+        case SYSCALL_CLOSE:
+            KERNEL_PANIC("Unhandled system call\n");
+            break;
+        case SYSCALL_SEEK:
+            KERNEL_PANIC("Unhandled system call\n");
+            break;
+        case SYSCALL_READ:
+            KERNEL_PANIC("Unhandled system call\n");
+            break;
+        case SYSCALL_WRITE:
+            KERNEL_PANIC("Unhandled system call\n");
+            break;
+        case SYSCALL_CREATE:
+            filename = (char*)(user_context->cpu_regs[MIPS_REGISTER_A1]);
+            size = (int)(user_context->cpu_regs[MIPS_REGISTER_A2]);
+            result = vfs_create(filename, size);
+            DEBUG("initprog", "results from create %d\n", result);
+            break;
+        case SYSCALL_DELETE:
+            KERNEL_PANIC("Unhandled system call\n");
+            break;
     #endif
     default: 
         KERNEL_PANIC("Unhandled system call\n");
@@ -103,4 +114,7 @@ void syscall_handle(context_t *user_context)
 
     /* Move to next instruction after system call */
     user_context->pc += 4;
+    #ifdef CHANGED_2
+        user_context->cpu_regs[MIPS_REGISTER_V0] = result;
+    #endif
 }
