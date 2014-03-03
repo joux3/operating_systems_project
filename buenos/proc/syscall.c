@@ -102,10 +102,10 @@ void syscall_handle(context_t *user_context)
             filename = (char*)(user_context->cpu_regs[MIPS_REGISTER_A1]);
             size = (int)(user_context->cpu_regs[MIPS_REGISTER_A2]);
             result = vfs_create(filename, size);
-            DEBUG("initprog", "results from create %d\n", result);
             break;
         case SYSCALL_DELETE:
-            KERNEL_PANIC("Unhandled system call\n");
+            filename = (char*)(user_context->cpu_regs[MIPS_REGISTER_A1]);
+            result = vfs_remove(filename);
             break;
     #endif
     default: 
