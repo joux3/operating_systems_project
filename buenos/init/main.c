@@ -234,6 +234,11 @@ void init(void)
       lock_cond_init();
     #endif
 
+    #ifdef CHANGED_2
+      kwrite("Initializing process tables\n");
+      process_init_process_table();
+    #endif
+
     kwrite("Initializing device drivers\n");
     device_init();
 

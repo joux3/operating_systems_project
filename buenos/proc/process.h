@@ -68,13 +68,15 @@ lock_t *process_table_lock;
 cond_t *process_zombie_cv;
 
 typedef struct {
-    uint32_t free;
+    uint32_t in_use;
     process_id_t owner;
     openfile_t vfs_handle; 
 } process_filehandle_t;
 
 process_filehandle_t process_filehandle_table[CONFIG_MAX_OPEN_FILES];
 lock_t *process_filehandle_lock;
+
+void process_init_process_table();
 
 #endif
 

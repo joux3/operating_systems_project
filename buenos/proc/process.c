@@ -51,6 +51,24 @@
  * This module contains a function to start a userland process.
  */
 
+#ifdef CHANGED_2
+void process_init_process_table(void) {
+    int i;
+
+    process_table_lock = lock_create();
+    process_filehandle_lock = lock_create();
+    process_zombie_cv = condition_create();
+
+    for (i = 0; i < CONFIG_MAX_PROCESS_COUNT; i++) {
+        process_table[i].state = PROCESS_FREE;
+    }
+    
+    for (i = 0; i < CONFIG_MAX_OPEN_FILES; i++) {
+        process_filehandle_table[i].in_use = 0;
+    }
+}
+#endif
+
 /**
  * Starts one userland process. The thread calling this function will
  * be used to run the process and will therefore never return from
