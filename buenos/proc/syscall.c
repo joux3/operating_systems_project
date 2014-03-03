@@ -39,6 +39,9 @@
 #include "kernel/panic.h"
 #include "lib/libc.h"
 #include "kernel/assert.h"
+#ifdef CHANGED_2
+    #include "fs/vfs.h"
+#endif
 
 /**
  * Handle system calls. Interrupts are enabled when this function is
@@ -62,6 +65,38 @@ void syscall_handle(context_t *user_context)
     case SYSCALL_HALT:
         halt_kernel();
         break;
+    #ifdef CHANGED_2
+    case SYSCALL_EXEC:
+        KERNEL_PANIC("Unhandled system call\n");
+        break;
+    case SYSCALL_EXIT:
+        KERNEL_PANIC("Unhandled system call\n");
+        break;
+    case SYSCALL_JOIN:
+        KERNEL_PANIC("Unhandled system call\n");
+        break;
+    case SYSCALL_OPEN:
+        KERNEL_PANIC("Unhandled system call\n");
+        break;
+    case SYSCALL_CLOSE:
+        KERNEL_PANIC("Unhandled system call\n");
+        break;
+    case SYSCALL_SEEK:
+        KERNEL_PANIC("Unhandled system call\n");
+        break;
+    case SYSCALL_READ:
+        KERNEL_PANIC("Unhandled system call\n");
+        break;
+    case SYSCALL_WRITE:
+        KERNEL_PANIC("Unhandled system call\n");
+        break;
+    case SYSCALL_CREATE:
+        KERNEL_PANIC("Unhandled system call\n");
+        break;
+    case SYSCALL_DELETE:
+        KERNEL_PANIC("Unhandled system call\n");
+        break;
+    #endif
     default: 
         KERNEL_PANIC("Unhandled system call\n");
     }
