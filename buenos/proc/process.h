@@ -76,7 +76,7 @@ typedef struct {
 process_filehandle_t process_filehandle_table[CONFIG_MAX_OPEN_FILES];
 lock_t *process_filehandle_lock;
 
-void process_init_process_table();
+void process_init_process_table(void);
 
 #endif
 
