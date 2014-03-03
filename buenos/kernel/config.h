@@ -123,4 +123,9 @@
  */
 #define CONFIG_USERLAND_STACK_SIZE 1
 
+#ifdef CHANGED_2
+    // Maximum count of processes
+    #define CONFIG_MAX_PROCESS_COUNT 64
+#endif
+
 #endif /* BUENOS_CONFIG_H */
