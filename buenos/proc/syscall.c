@@ -42,6 +42,14 @@
 #ifdef CHANGED_2
     #include "fs/vfs.h"
     #include "lib/debug.h"
+    #include "drivers/tty.h"
+    #include "drivers/device.h"
+
+gcd_t *syscall_get_console_gcd(void) {
+    // get first device (index 0) of type console
+    return (gcd_t*)device_get(YAMS_TYPECODE_TTY, 0)->generic_device;
+}
+
 #endif
 
 /**
@@ -66,6 +74,8 @@ void syscall_handle(context_t *user_context)
         int result;
         char *filename;
         int size;
+        int filehandle;
+        gcd_t *console;
         result = -1;
     #endif
 
@@ -93,17 +103,44 @@ void syscall_handle(context_t *user_context)
             KERNEL_PANIC("Unhandled system call\n");
             break;
         case SYSCALL_READ:
-            KERNEL_PANIC("Unhandled system call\n");
+            filehandle = (int)(user_context->cpu_regs[MIPS_REGISTER_A1]);
+            if (filehandle == FILEHANDLE_STDOUT || filehandle == FILEHANDLE_STDERR) {
+                result = -1;
+                break;
+            }
+            // TODO also handle files
+            // TODO read into kernel buffer
+            if (filehandle == FILEHANDLE_STDIN) {
+                console = syscall_get_console_gcd();
+                result = console->read(console, (void*)(user_context->cpu_regs[MIPS_REGISTER_A2]), (int)(user_context->cpu_regs[MIPS_REGISTER_A3]));
+            } else {
+                KERNEL_PANIC("Files not supported in syscall_read yet\n");
+            }
+            // TODO safely copy from kernel buffer to userland
             break;
         case SYSCALL_WRITE:
-            KERNEL_PANIC("Unhandled system call\n");
+            filehandle = (int)(user_context->cpu_regs[MIPS_REGISTER_A1]);
+            if (filehandle == FILEHANDLE_STDIN) {
+                result = -1;
+                break;
+            }
+            // TODO find filehandle if a file
+            // TODO safely copy to kernel
+            if (filehandle == FILEHANDLE_STDOUT || filehandle == FILEHANDLE_STDERR) {
+                console = syscall_get_console_gcd();
+                result = console->write(console, (void*)(user_context->cpu_regs[MIPS_REGISTER_A2]), (int)(user_context->cpu_regs[MIPS_REGISTER_A3]));
+            } else {
+                KERNEL_PANIC("Files not supported in syscall_write\n");
+            }
             break;
         case SYSCALL_CREATE:
+            // TODO safely copy filename from userland to kernel
             filename = (char*)(user_context->cpu_regs[MIPS_REGISTER_A1]);
             size = (int)(user_context->cpu_regs[MIPS_REGISTER_A2]);
             result = vfs_create(filename, size);
             break;
         case SYSCALL_DELETE:
+            // TODO safely copy filename from userland to kernel
             filename = (char*)(user_context->cpu_regs[MIPS_REGISTER_A1]);
             result = vfs_remove(filename);
             break;
@@ -118,3 +155,4 @@ void syscall_handle(context_t *user_context)
         user_context->cpu_regs[MIPS_REGISTER_V0] = result;
     #endif
 }
+
