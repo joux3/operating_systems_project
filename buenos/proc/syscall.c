@@ -99,12 +99,14 @@ int read_from_handle(int filehandle, void* buffer, int length) {
         console = syscall_get_console_gcd();
         result = console->read(console, buffer, length);
     } else {
+        lock_acquire(process_filehandle_lock);
         process_filehandle_t *handle_entry = &process_filehandle_table[filehandle - 3];
         if (!handle_entry->in_use || handle_entry->owner == syscall_get_current_process()) {
             result = vfs_read(handle_entry->vfs_handle, buffer, length);
         } else {
             result = -1;
         }
+        lock_release(process_filehandle_lock);
     }
     return result;
     // TODO safely copy from kernel buffer to userland
@@ -121,8 +123,10 @@ int write_to_handle(int filehandle, void* buffer, int length) {
         console = syscall_get_console_gcd();
         result = console->write(console, buffer, length);
     } else {
+        lock_acquire(process_filehandle_lock);
         result = -1;
         KERNEL_PANIC("Files not supported in syscall_write\n");
+        lock_release(process_filehandle_lock);
     }
     return result;
 }
