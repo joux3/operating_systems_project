@@ -14,5 +14,10 @@ int main(void) {
     } else {
         syscall_write(stdout, "failed to open file\n", 20);
     }
+    filehandle = syscall_close(filehandle);
+    if (!filehandle)
+        syscall_write(stdout, "succeeded in closing file\n", 26);
+    else
+        syscall_write(stdout, "failed at closing file\n", 23);
     return 0;
 }
