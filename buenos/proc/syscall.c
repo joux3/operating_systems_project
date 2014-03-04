@@ -56,6 +56,90 @@ process_id_t syscall_get_current_process(void) {
 
 #endif
 
+#ifdef CHANGED_2
+
+/**
+ * Syscall handler functions
+ */
+
+int open_file(char* filename) {
+    // TODO safely copy filename to kernel
+    int process_filehandle, i;
+    openfile_t openfile;
+    process_filehandle = -1;
+    for (i = 0; i < CONFIG_MAX_OPEN_FILES; i++) {
+        if (!process_filehandle_table[i].in_use) {
+            process_filehandle = i;
+            break;
+        }
+    } 
+    if (process_filehandle >= 0) {
+        openfile = vfs_open(filename);
+        if (openfile >= 0) {
+            process_filehandle_table[i].in_use = 1;
+            process_filehandle_table[i].vfs_handle = openfile;
+            process_filehandle_table[i].owner = syscall_get_current_process();
+        } else {
+            process_filehandle = -1;
+        }
+    } 
+    if (process_filehandle >= 0) {
+        process_filehandle += 3;
+    }
+    return process_filehandle;
+}
+
+int read_from_handle(int filehandle, void* buffer, int length) {
+    // TODO: check that buffer is within user mapped region
+    int result;
+    gcd_t *console;
+    if (filehandle == FILEHANDLE_STDOUT || filehandle == FILEHANDLE_STDERR) {
+        result = -1;
+    } else if (filehandle == FILEHANDLE_STDIN) {
+        console = syscall_get_console_gcd();
+        result = console->read(console, buffer, length);
+    } else {
+        process_filehandle_t *handle_entry = &process_filehandle_table[filehandle - 3];
+        if (!handle_entry->in_use || handle_entry->owner == syscall_get_current_process()) {
+            result = vfs_read(handle_entry->vfs_handle, buffer, length);
+        } else {
+            result = -1;
+        }
+    }
+    return result;
+    // TODO safely copy from kernel buffer to userland
+}
+
+int write_to_handle(int filehandle, void* buffer, int length) {
+    int result;
+    gcd_t *console;
+    if (filehandle == FILEHANDLE_STDIN) {
+        result = -1;
+    } else if (filehandle == FILEHANDLE_STDOUT || filehandle == FILEHANDLE_STDERR) {
+        // TODO find filehandle if a file
+        // TODO safely copy to kernel
+        console = syscall_get_console_gcd();
+        result = console->write(console, buffer, length);
+    } else {
+        result = -1;
+        KERNEL_PANIC("Files not supported in syscall_write\n");
+    }
+    return result;
+}
+
+int create_file(char* filename, int size) {
+    // TODO safely copy filename from userland to kernel
+    return vfs_create(filename, size);
+}
+
+int remove_file(char* filename) {
+    // TODO safely copy filename from userland to kernel
+    return vfs_remove(filename);
+
+}
+
+#endif
+
 /**
  * Handle system calls. Interrupts are enabled when this function is
  * called.
@@ -76,13 +160,6 @@ void syscall_handle(context_t *user_context)
      */
     #ifdef CHANGED_2
         int result;
-        char *filename;
-        int size;
-        int process_filehandle;
-        int filehandle;
-        int i;
-        openfile_t openfile;
-        gcd_t *console;
         result = -1;
     #endif
 
@@ -101,30 +178,8 @@ void syscall_handle(context_t *user_context)
             KERNEL_PANIC("Unhandled system call\n");
             break;
         case SYSCALL_OPEN:
-            // TODO safely copy filename to kernel
-            filename = (char*)(user_context->cpu_regs[MIPS_REGISTER_A1]);
             lock_acquire(process_filehandle_lock);
-            process_filehandle = -1;
-            for (i = 0; i < CONFIG_MAX_OPEN_FILES; i++) {
-                if (!process_filehandle_table[i].in_use) {
-                    process_filehandle = i;
-                    break;
-                }
-            } 
-            if (process_filehandle >= 0) {
-                openfile = vfs_open(filename);
-                if (openfile >= 0) {
-                    process_filehandle_table[i].in_use = 1;
-                    process_filehandle_table[i].vfs_handle = openfile;
-                    process_filehandle_table[i].owner = syscall_get_current_process();
-                } else {
-                    process_filehandle = -1;
-                }
-            } 
-            if (process_filehandle >= 0) {
-                process_filehandle += 3;
-            }
-            result = process_filehandle;
+            result = open_file((char*)(user_context->cpu_regs[MIPS_REGISTER_A1]));
             lock_release(process_filehandle_lock);
             break;
         case SYSCALL_CLOSE:
@@ -134,47 +189,21 @@ void syscall_handle(context_t *user_context)
             KERNEL_PANIC("Unhandled system call\n");
             break;
         case SYSCALL_READ:
-            filehandle = (int)(user_context->cpu_regs[MIPS_REGISTER_A1]);
-            if (filehandle == FILEHANDLE_STDOUT || filehandle == FILEHANDLE_STDERR) {
-                result = -1;
-                break;
-            }
-            if (filehandle == FILEHANDLE_STDIN) {
-                console = syscall_get_console_gcd();
-                result = console->read(console, (void*)(user_context->cpu_regs[MIPS_REGISTER_A2]), (int)(user_context->cpu_regs[MIPS_REGISTER_A3]));
-            } else {
-                process_filehandle_t *handle_entry = &process_filehandle_table[filehandle - 3];
-                if (!handle_entry->in_use || handle_entry->owner == syscall_get_current_process()) {
-                    result = vfs_read(handle_entry->vfs_handle, (void*)(user_context->cpu_regs[MIPS_REGISTER_A2]), (int)(user_context->cpu_regs[MIPS_REGISTER_A3]));
-                }
-            }
-            // TODO safely copy from kernel buffer to userland
+            result = read_from_handle((int)(user_context->cpu_regs[MIPS_REGISTER_A1]),
+                        (void*)(user_context->cpu_regs[MIPS_REGISTER_A2]),
+                        (int)(user_context->cpu_regs[MIPS_REGISTER_A3]));
             break;
         case SYSCALL_WRITE:
-            filehandle = (int)(user_context->cpu_regs[MIPS_REGISTER_A1]);
-            if (filehandle == FILEHANDLE_STDIN) {
-                result = -1;
-                break;
-            }
-            // TODO find filehandle if a file
-            // TODO safely copy to kernel
-            if (filehandle == FILEHANDLE_STDOUT || filehandle == FILEHANDLE_STDERR) {
-                console = syscall_get_console_gcd();
-                result = console->write(console, (void*)(user_context->cpu_regs[MIPS_REGISTER_A2]), (int)(user_context->cpu_regs[MIPS_REGISTER_A3]));
-            } else {
-                KERNEL_PANIC("Files not supported in syscall_write\n");
-            }
+            result = write_to_handle((int)(user_context->cpu_regs[MIPS_REGISTER_A1]),
+                        (void*)(user_context->cpu_regs[MIPS_REGISTER_A2]),
+                        (int)(user_context->cpu_regs[MIPS_REGISTER_A3]));
             break;
         case SYSCALL_CREATE:
-            // TODO safely copy filename from userland to kernel
-            filename = (char*)(user_context->cpu_regs[MIPS_REGISTER_A1]);
-            size = (int)(user_context->cpu_regs[MIPS_REGISTER_A2]);
-            result = vfs_create(filename, size);
+            result = create_file((char*)(user_context->cpu_regs[MIPS_REGISTER_A1]),
+                        (int)(user_context->cpu_regs[MIPS_REGISTER_A2]));
             break;
         case SYSCALL_DELETE:
-            // TODO safely copy filename from userland to kernel
-            filename = (char*)(user_context->cpu_regs[MIPS_REGISTER_A1]);
-            result = vfs_remove(filename);
+            result = remove_file((char*)(user_context->cpu_regs[MIPS_REGISTER_A1]));
             break;
     #endif
     default: 
@@ -187,4 +216,3 @@ void syscall_handle(context_t *user_context)
         user_context->cpu_regs[MIPS_REGISTER_V0] = result;
     #endif
 }
-
