@@ -226,12 +226,14 @@ int process_start(const char *executable)
     uint32_t stack_bottom;
     elf_info_t elf;
     openfile_t file;
+    int invalid;
 
     int i;
     
     interrupt_status_t intr_status;
 
     process_id = -1;
+    invalid = 0;
     my_entry = thread_get_current_thread_entry();
 
     original_pagetable = my_entry->pagetable;
@@ -268,7 +270,15 @@ int process_start(const char *executable)
 
     file = vfs_open((char *)executable);
     /* Make sure the file existed and was a valid ELF file */
-    if (file < 0 || !elf_parse_header(&elf, file)) {
+    invalid = invalid || (file < 0);
+    invalid = invalid || !elf_parse_header(&elf, file);
+    /* Trivial and naive sanity check for entry point: */
+    invalid = invalid || (elf.entry_point < PAGE_SIZE);
+    /* Calculate the number of pages needed by the whole process
+       (including userland stack). Since we don't have proper tlb
+       handling code, all these pages must fit into TLB. */
+    invalid = invalid || (elf.ro_pages + elf.rw_pages + CONFIG_USERLAND_STACK_SIZE > _tlb_get_maxindex() + 1);
+    if (invalid) {
         intr_status = _interrupt_disable();
         my_entry->pagetable = original_pagetable;
         _interrupt_set_state(intr_status);
@@ -279,14 +289,6 @@ int process_start(const char *executable)
         return -1;
     }
 
-    /* Trivial and naive sanity check for entry point: */
-    KERNEL_ASSERT(elf.entry_point >= PAGE_SIZE);
-
-    /* Calculate the number of pages needed by the whole process
-       (including userland stack). Since we don't have proper tlb
-       handling code, all these pages must fit into TLB. */
-    KERNEL_ASSERT(elf.ro_pages + elf.rw_pages + CONFIG_USERLAND_STACK_SIZE
-                  <= _tlb_get_maxindex() + 1);
 
     /* Allocate and map stack */
     for(i = 0; i < CONFIG_USERLAND_STACK_SIZE; i++) {
