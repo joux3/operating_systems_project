@@ -68,7 +68,7 @@ int elf_parse_header(elf_info_t *elf, openfile_t file)
 
     /* Read the ELF header */
     if (vfs_read(file, &elf_hdr, sizeof(elf_hdr))
-	!= sizeof(elf_hdr)) {
+        != sizeof(elf_hdr)) {
         return 0;
     }
 
@@ -79,25 +79,25 @@ int elf_parse_header(elf_info_t *elf, openfile_t file)
 
     /* File data is not MIPS 32 bit big-endian */
     if (elf_hdr.e_ident.c[EI_CLASS] != ELFCLASS32
-	|| elf_hdr.e_ident.c[EI_DATA] != ELFDATA2MSB
-	|| elf_hdr.e_machine != EM_MIPS) {
-	return 0;
+        || elf_hdr.e_ident.c[EI_DATA] != ELFDATA2MSB
+        || elf_hdr.e_machine != EM_MIPS) {
+        return 0;
     }
 
     /* Invalid ELF version */
     if (elf_hdr.e_version != EV_CURRENT 
-	|| elf_hdr.e_ident.c[EI_VERSION] != EV_CURRENT) {
-	return 0;
+        || elf_hdr.e_ident.c[EI_VERSION] != EV_CURRENT) {
+        return 0;
     }
 
     /* Not an executable file */
     if (elf_hdr.e_type != ET_EXEC) {
-	return 0;
+        return 0;
     }
 
     /* No program headers */
     if (elf_hdr.e_phnum == 0) {
-	return 0;
+        return 0;
     }
 
     /* Zero the return structure. Uninitialized data is bad(TM). */
@@ -112,59 +112,70 @@ int elf_parse_header(elf_info_t *elf, openfile_t file)
 
     /* Read the program headers. */
     for (i = 0; i < elf_hdr.e_phnum; i++) {
-	if (vfs_read(file, &program_hdr, sizeof(program_hdr))
-	    != sizeof(program_hdr)) {
-	    return 0;
-	}
+        if (vfs_read(file, &program_hdr, sizeof(program_hdr))
+            != sizeof(program_hdr)) {
+            return 0;
+        }
 
-	switch (program_hdr.p_type) {
-	case PT_NULL:
-	case PT_NOTE:
-	case PT_PHDR:
-	    /* These program headers can be ignored */
-	    break;
-	case PT_LOAD:
-	    /* These are the ones we are looking for */
+        switch (program_hdr.p_type) {
+        case PT_NULL:
+        case PT_NOTE:
+        case PT_PHDR:
+            /* These program headers can be ignored */
+            break;
+        case PT_LOAD:
+            /* These are the ones we are looking for */
 
-	    /* The RW segment */
-	    if (program_hdr.p_flags & PF_W) {
-		if (segs & SEG_RW) { /* already have an RW segment*/
-		    return 0;
-		}
-		segs |= SEG_RW;
+            /* The RW segment */
+            if (program_hdr.p_flags & PF_W) {
+                if (segs & SEG_RW) { /* already have an RW segment*/
+                    return 0;
+                }
+                segs |= SEG_RW;
 
-		elf->rw_location = program_hdr.p_offset;
-		elf->rw_size = program_hdr.p_filesz;
-		elf->rw_vaddr = program_hdr.p_vaddr;
-		/* memory size rounded up to the page boundary, in pages */
-		elf->rw_pages = 
-		    (program_hdr.p_memsz + PAGE_SIZE - 1) / PAGE_SIZE;
+                elf->rw_location = program_hdr.p_offset;
+                elf->rw_size = program_hdr.p_filesz;
+                elf->rw_vaddr = program_hdr.p_vaddr;
+                /* memory size rounded up to the page boundary, in pages */
+                elf->rw_pages = 
+                    (program_hdr.p_memsz + PAGE_SIZE - 1) / PAGE_SIZE;
 
-	    /* The RO segment */
-	    } else {
-		if (segs & SEG_RO) { /* already have an RO segment*/
-		    return 0;
-		}
-		segs |= SEG_RO; 
+            /* The RO segment */
+            } else {
+                if (segs & SEG_RO) { /* already have an RO segment*/
+                    return 0;
+                }
+                segs |= SEG_RO; 
 
-		elf->ro_location = program_hdr.p_offset;
-		elf->ro_size = program_hdr.p_filesz;
-		elf->ro_vaddr = program_hdr.p_vaddr;
-		/* memory size rounded up to the page boundary, in pages */
-		elf->ro_pages = 
-		    (program_hdr.p_memsz + PAGE_SIZE - 1) / PAGE_SIZE;
-	    }
+                elf->ro_location = program_hdr.p_offset;
+                elf->ro_size = program_hdr.p_filesz;
+                elf->ro_vaddr = program_hdr.p_vaddr;
+                /* memory size rounded up to the page boundary, in pages */
+                elf->ro_pages = 
+                    (program_hdr.p_memsz + PAGE_SIZE - 1) / PAGE_SIZE;
+            }
 
-	    break;
-	default:
-	    /* Other program headers indicate an incompatible file */
-	    return 0;
-	}
+            break;
+        default:
+            /* Other program headers indicate an incompatible file */
+            return 0;
+        }
 
-	/* In case the program header size is non-standard: */
-	current_position += sizeof(program_hdr);
-	vfs_seek(file, current_position);
+        /* In case the program header size is non-standard: */
+        current_position += sizeof(program_hdr);
+        vfs_seek(file, current_position);
     }
+
+    #ifdef CHANGED_2
+        /* check that the segments don't overlap in destination memory */
+        if ((segs & SEG_RO) && (segs & SEG_RW)) {
+            elf.ro_vaddr 
+            elf.ro_size
+            elf.ro_vaddr 
+            elf.ro_size
+        }
+    #endif
+    
 
     /* Make sure either RW or RO segment is present: */
     return (segs > 0);
