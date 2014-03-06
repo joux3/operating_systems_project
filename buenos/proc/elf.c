@@ -63,6 +63,9 @@ int elf_parse_header(elf_info_t *elf, openfile_t file)
     int i;
     int current_position;
     int segs = 0;
+    #if CHANGED_2
+        int valid_entry_point = 0;
+    #endif
 #define SEG_RO 1
 #define SEG_RW 2
 
@@ -169,11 +172,24 @@ int elf_parse_header(elf_info_t *elf, openfile_t file)
     #ifdef CHANGED_2
         /* check that the segments don't overlap in destination memory */
         if ((segs & SEG_RO) && (segs & SEG_RW)) {
-            elf.ro_vaddr 
-            elf.ro_size
-            elf.ro_vaddr 
-            elf.ro_size
+            if (elf->ro_vaddr < elf->rw_vaddr) {
+                if (elf->ro_vaddr + elf->ro_size >= elf->rw_vaddr)
+                    return 0;
+            } else {
+                if (elf->rw_vaddr + elf->rw_size >= elf->ro_vaddr)
+                    return 0;
+            }
         }
+
+        /* check that the entry point is inside a segment */
+        if ((segs & SEG_RO) && (elf->ro_vaddr <= elf->entry_point && (elf->ro_vaddr + elf->ro_size) >= elf->entry_point)) {
+            valid_entry_point = 1;
+        }
+        if ((segs & SEG_RW) && (elf->rw_vaddr <= elf->entry_point && (elf->rw_vaddr + elf->rw_size) >= elf->entry_point)) {
+            valid_entry_point = 1;
+        }
+        if (!valid_entry_point)
+            return 0;
     #endif
     
 
