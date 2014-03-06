@@ -105,6 +105,20 @@ int close_file(int filehandle) {
     return result;
 }
 
+int seek_file(int filehandle, int pos) {
+    int result;
+    filehandle -= 3;
+    if (filehandle < 0 || filehandle >= CONFIG_MAX_OPEN_FILES) { 
+        result = -1;
+    } else if (!process_filehandle_table[filehandle].in_use ||
+        process_filehandle_table[filehandle].owner != syscall_get_current_process()) {
+        result = -1;
+    } else {
+        result = vfs_seek(process_filehandle_table[filehandle].vfs_handle, pos);
+    }
+    return result;
+}
+
 int read_from_handle(int filehandle, void* buffer, int length) {
     // TODO: check that buffer is within user mapped region
     int result;
@@ -216,7 +230,10 @@ void syscall_handle(context_t *user_context)
             lock_release(process_filehandle_lock);
             break;
         case SYSCALL_SEEK:
-            KERNEL_PANIC("Unhandled system call\n");
+            lock_acquire(process_filehandle_lock);
+            result = seek_file((int)(user_context->cpu_regs[MIPS_REGISTER_A1]),
+                               (int)(user_context->cpu_regs[MIPS_REGISTER_A2]));
+            lock_release(process_filehandle_lock);
             break;
         case SYSCALL_READ:
             result = read_from_handle((int)(user_context->cpu_regs[MIPS_REGISTER_A1]),

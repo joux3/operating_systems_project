@@ -42,7 +42,6 @@
 #include "proc/syscall.h"
 #include "tests/lib.h"
 
-
 /* Halt the system (sync disks and power off). This function will
  * never return. 
  */
@@ -182,4 +181,24 @@ int syscall_create(const char *filename, int size)
 int syscall_delete(const char *filename)
 {
     return (int)_syscall(SYSCALL_DELETE, (uint32_t)filename, 0, 0);
+}
+
+
+void prints(const char *str) {
+    int written;
+    int len; 
+    len = strlen(str);
+    written = 0;
+    while (written < len) {
+        written += syscall_write(stdout, (void*)&(str[written]), len - written);
+    }
+}
+
+int strlen(const char *str) {
+    int len;
+    len = 0;
+    while(str[len] != '\0') {
+        len++;
+    }
+    return len;
 }
