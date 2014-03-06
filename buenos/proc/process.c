@@ -109,7 +109,7 @@ char* userland_to_kernel_strcpy(char* src, char* dst)
 
     i = 0;
     retval = dst;
-    while(src + i < (void*)USERLAND_STACK_TOP)
+    while(src + i < (char*)USERLAND_STACK_TOP)
     {
         *(dst + i) = *(src + i);
         if(my_entry->copy_error_status != 0)
