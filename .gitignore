@@ -28,3 +28,9 @@
 # executables
 buenos/buenos
 tfstool
+store.file
+buenos/tests/loop
+buenos/tests/halt
+buenos/tests/cat
+buenos/tests/rm
+buenos/tests/touch
