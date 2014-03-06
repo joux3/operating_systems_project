@@ -86,16 +86,16 @@ void thread_table_init(void)
 
     /* Init all entries to 'NULL' */
     for (i=0; i<CONFIG_MAX_THREADS; i++) {
-	/* Set context pointers to the top of the stack*/
-	thread_table[i].context      = (context_t *) (thread_stack_areas
-	    +CONFIG_THREAD_STACKSIZE*i + CONFIG_THREAD_STACKSIZE - 
-						      sizeof(context_t));
-	thread_table[i].user_context = NULL;
-	thread_table[i].state        = THREAD_FREE;
-	thread_table[i].sleeps_on    = 0;
-	thread_table[i].pagetable    = NULL;
-	thread_table[i].process_id   = -1;	
-	thread_table[i].next         = -1;	
+    /* Set context pointers to the top of the stack*/
+    thread_table[i].context      = (context_t *) (thread_stack_areas
+        +CONFIG_THREAD_STACKSIZE*i + CONFIG_THREAD_STACKSIZE - 
+                              sizeof(context_t));
+    thread_table[i].user_context = NULL;
+    thread_table[i].state        = THREAD_FREE;
+    thread_table[i].sleeps_on    = 0;
+    thread_table[i].pagetable    = NULL;
+    thread_table[i].process_id   = -1;    
+    thread_table[i].next         = -1;    
         #ifdef CHANGED_1
             thread_table[i].sleeps_until = 0;
             thread_table[i].priority = PRIORITY_NORMAL;
@@ -103,15 +103,15 @@ void thread_table_init(void)
     }
 
     thread_table[IDLE_THREAD_TID].context->cpu_regs[MIPS_REGISTER_SP] =
-	(uint32_t) thread_stack_areas + CONFIG_THREAD_STACKSIZE -4 -
-	sizeof(context_t);
+    (uint32_t) thread_stack_areas + CONFIG_THREAD_STACKSIZE -4 -
+    sizeof(context_t);
     thread_table[IDLE_THREAD_TID].context->pc = 
         (uint32_t) _idle_thread_wait_loop;
     thread_table[IDLE_THREAD_TID].context->status = 
         INTERRUPT_MASK_ALL | INTERRUPT_MASK_MASTER;
     thread_table[IDLE_THREAD_TID].state = THREAD_READY;
     thread_table[IDLE_THREAD_TID].context->prev_context =
-	thread_table[IDLE_THREAD_TID].context;
+    thread_table[IDLE_THREAD_TID].context;
 }
 
 
@@ -182,6 +182,10 @@ TID_t thread_create(void (*func)(uint32_t), uint32_t arg)
         thread_table[tid].sleeps_on    = 0;
         thread_table[tid].process_id   = -1;
         thread_table[tid].next         = -1;
+        #ifdef CHANGED_2
+        thread_table[tid].on_kernel_copy = 0; 
+        thread_table[tid].copy_error_status = 0; 
+        #endif
 
         /* Make sure that we always have a valid back reference on context chain */
         thread_table[tid].context->prev_context = thread_table[tid].context;
@@ -213,6 +217,7 @@ TID_t thread_create(void (*func)(uint32_t), uint32_t arg)
 
         return tid;
     #endif
+
 }
 
 
@@ -276,6 +281,10 @@ TID_t thread_create_priority(void (*func)(uint32_t), uint32_t arg, priority_t pr
     thread_table[tid].next         = -1;
     thread_table[tid].sleeps_until = 0;
     thread_table[tid].priority = priority;
+    #ifdef CHANGED_2
+    thread_table[tid].on_kernel_copy = 0; 
+    thread_table[tid].copy_error_status = 0; 
+    #endif
 
     /* Make sure that we always have a valid back reference on context chain */
     thread_table[tid].context->prev_context = thread_table[tid].context;

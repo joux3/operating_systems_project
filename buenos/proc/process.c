@@ -81,6 +81,64 @@ void process_init_process_table(void) {
  * @executable The name of the executable to be run in the userland
  * process
  */
+
+/* TODO Set thread copy flags when creating thread */
+#ifdef CHANGED_2
+/*
+void _kernel_to_userland_memcpy(void* mem, uint32_t lenmem, uint32_t* terminating_val)
+{
+
+}
+*/
+
+/* returns NULL if failure, otherwise dst */
+void* _userland_to_kernel_memcpy(void* src, void* dst, uint32_t lenmem)
+{
+
+    thread_table_t *my_entry;
+    void * retval;
+    uint32_t i;
+
+    interrupt_status_t intr_status;
+
+    my_entry = thread_get_current_thread_entry();
+
+    /* check that we are currently not on copy status */
+    KERNEL_ASSERT(my_entry->on_kernel_copy == 0);
+
+    intr_status = _interrupt_disable();
+    _interrupt_set_state(intr_status);
+
+    my_entry->on_kernel_copy = 1;
+
+    for(i = 0; i < lenmem; i++)
+    {
+        /* if we are not on userland memory area return NULL */
+        if(src + i >= (void*)USERLAND_STACK_TOP)
+        {
+            retval = NULL;
+            goto exit;
+        }
+        *(uint8_t*)(dst + i) = *(uint8_t*)(src + i);
+        /*check if exception flags rise */  
+        if(my_entry->copy_error_status != 0)
+        {
+            retval = NULL;
+            goto exit;
+        }
+    }
+    
+    retval = dst;
+    
+    exit:
+
+    intr_status = _interrupt_enable();
+    _interrupt_set_state(intr_status);
+    
+    return retval;
+}
+#endif
+
 void process_start(const char *executable)
 {
     thread_table_t *my_entry;
@@ -121,7 +179,7 @@ void process_start(const char *executable)
        (including userland stack). Since we don't have proper tlb
        handling code, all these pages must fit into TLB. */
     KERNEL_ASSERT(elf.ro_pages + elf.rw_pages + CONFIG_USERLAND_STACK_SIZE
-		  <= _tlb_get_maxindex() + 1);
+          <= _tlb_get_maxindex() + 1);
 
     /* Allocate and map stack */
     for(i = 0; i < CONFIG_USERLAND_STACK_SIZE; i++) {
@@ -168,19 +226,19 @@ void process_start(const char *executable)
     /* Copy segments */
 
     if (elf.ro_size > 0) {
-	/* Make sure that the segment is in proper place. */
+    /* Make sure that the segment is in proper place. */
         KERNEL_ASSERT(elf.ro_vaddr >= PAGE_SIZE);
         KERNEL_ASSERT(vfs_seek(file, elf.ro_location) == VFS_OK);
         KERNEL_ASSERT(vfs_read(file, (void *)elf.ro_vaddr, elf.ro_size)
-		      == (int)elf.ro_size);
+              == (int)elf.ro_size);
     }
 
     if (elf.rw_size > 0) {
-	/* Make sure that the segment is in proper place. */
+    /* Make sure that the segment is in proper place. */
         KERNEL_ASSERT(elf.rw_vaddr >= PAGE_SIZE);
         KERNEL_ASSERT(vfs_seek(file, elf.rw_location) == VFS_OK);
         KERNEL_ASSERT(vfs_read(file, (void *)elf.rw_vaddr, elf.rw_size)
-		      == (int)elf.rw_size);
+              == (int)elf.rw_size);
     }
 
 

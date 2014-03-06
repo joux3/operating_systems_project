@@ -40,6 +40,10 @@
 #include "lib/libc.h"
 #include "vm/tlb.h"
 
+#if CHANGED_2
+#include "kernel/thread.h"
+#endif
+
 /**
    Prints failed virtual addresses when TLB exception occurs. This
    is helpfull when the only case of TLB exception is a bug in kernel.
@@ -79,56 +83,73 @@ void kernel_exception_handle(int exception)
     /* Clear EXL to make normal interrupt disable/enable work. */
     _interrupt_clear_EXL();
 
-    switch(exception) {
-    case EXCEPTION_TLBM:
-        print_tlb_debug();
-	KERNEL_PANIC("TLB Modification: not handled yet");
-	break;
-    case EXCEPTION_TLBL:
-        print_tlb_debug();
-	KERNEL_PANIC("TLB Load: not handled yet");
-	break;
-    case EXCEPTION_TLBS:
-        print_tlb_debug();
-	KERNEL_PANIC("TLB Store: not handled yet");
-	break;
-    case EXCEPTION_ADDRL:
-	print_tlb_debug();
-	KERNEL_PANIC("Address Error Load: not handled yet");
-	break;
-    case EXCEPTION_ADDRS:
-	print_tlb_debug();
-	KERNEL_PANIC("Address Error Store: not handled yet");
-	break;
-    case EXCEPTION_BUSI:
-	print_tlb_debug();
-	KERNEL_PANIC("Bus Error Instruction: not handled yet");
-	break;
-    case EXCEPTION_BUSD:
-	print_tlb_debug();
-	KERNEL_PANIC("Bus Error Data: not handled yet");
-	break;
-    case EXCEPTION_SYSCALL:
-	KERNEL_PANIC("Syscall: From _kernel_ mode?");
-	break;
-    case EXCEPTION_BREAK:
-	KERNEL_PANIC("Breakpoint: not handled yet");
-	break;
-    case EXCEPTION_RESVI:
-	KERNEL_PANIC("Reserved instruction: not handled yet");
-	break;
-    case EXCEPTION_COPROC:
-	KERNEL_PANIC("Coprocessor unusable: buggy assembler code?");
-	break;
-    case EXCEPTION_AOFLOW:
-	KERNEL_PANIC("Arithmetic overflow: buggy assembler code?");
-	break;
-    case EXCEPTION_TRAP:
-	KERNEL_PANIC("Trap: this just should not happen");
-	break;
-    default:
-	KERNEL_PANIC("Unknown exception");
+    
+    #ifdef CHANGED_2
+    thread_table_t *my_entry;
+
+    my_entry= thread_get_current_thread_entry();
+
+    if(my_entry->on_kernel_copy)
+    {
+        my_entry->copy_error_status = exception;
+        goto exit;
     }
+    #endif
+
+    switch(exception) {
+        case EXCEPTION_TLBM:
+            print_tlb_debug();
+            KERNEL_PANIC("TLB Modification: not handled yet");
+            break;
+        case EXCEPTION_TLBL:
+            print_tlb_debug();
+            KERNEL_PANIC("TLB Load: not handled yet");
+            break;
+        case EXCEPTION_TLBS:
+            print_tlb_debug();
+            KERNEL_PANIC("TLB Store: not handled yet");
+            break;
+        case EXCEPTION_ADDRL:
+            print_tlb_debug();
+            KERNEL_PANIC("Address Error Load: not handled yet");
+            break;
+        case EXCEPTION_ADDRS:
+            print_tlb_debug();
+            KERNEL_PANIC("Address Error Store: not handled yet");
+            break;
+        case EXCEPTION_BUSI:
+            print_tlb_debug();
+            KERNEL_PANIC("Bus Error Instruction: not handled yet");
+            break;
+        case EXCEPTION_BUSD:
+            print_tlb_debug();
+            KERNEL_PANIC("Bus Error Data: not handled yet");
+            break;
+        case EXCEPTION_SYSCALL:
+            KERNEL_PANIC("Syscall: From _kernel_ mode?");
+            break;
+        case EXCEPTION_BREAK:
+            KERNEL_PANIC("Breakpoint: not handled yet");
+            break;
+        case EXCEPTION_RESVI:
+            KERNEL_PANIC("Reserved instruction: not handled yet");
+            break;
+        case EXCEPTION_COPROC:
+            KERNEL_PANIC("Coprocessor unusable: buggy assembler code?");
+            break;
+        case EXCEPTION_AOFLOW:
+            KERNEL_PANIC("Arithmetic overflow: buggy assembler code?");
+            break;
+        case EXCEPTION_TRAP:
+            KERNEL_PANIC("Trap: this just should not happen");
+            break;
+        default:
+            KERNEL_PANIC("Unknown exception");
+    }
+    
+    #ifdef CHANGED_2
+    exit:
+    #endif
 
     /* Interrupts are disabled by setting EXL after this point. */
     _interrupt_set_EXL();

@@ -62,6 +62,7 @@ typedef enum {
     } priority_t;
 #endif
 
+
 /* thread table data structure */
 typedef struct {
     /* context save areas context and user_context*/
@@ -84,14 +85,23 @@ typedef struct {
     TID_t next; 
     
     #ifdef CHANGED_1
-        /* earliest time when the thread should be run even with state THREAD_READY */ 
-        uint32_t sleeps_until;
-        /* thread priority */
-        priority_t priority;
+    /* earliest time when the thread should be run even with state THREAD_READY */ 
+    uint32_t sleeps_until;
+    /* thread priority */
+    priority_t priority;
+    #endif
+
+    #ifdef CHANGED_2
+    /*0 if not on kernel to userland memory copy, positive otherwise */
+    uint32_t on_kernel_copy;
+    /* 0 if no error positive otherwise */
+    uint32_t copy_error_status;
     #endif
 
     /* pad to 64 bytes */
-    #ifdef CHANGED_1
+    #ifdef CHANGED_2 
+    uint32_t dummy_alignment_fill[5]; 
+    #elif CHANGED_1
     uint32_t dummy_alignment_fill[7]; 
     #else
     uint32_t dummy_alignment_fill[9]; 
