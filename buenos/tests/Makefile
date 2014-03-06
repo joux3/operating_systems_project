@@ -36,7 +36,7 @@
 # $Id: Makefile,v 1.6 2005/05/09 00:05:44 jaatroko Exp $
 
 # Add your _userland_ program sources to this variable:
-SOURCES  := halt.c loop.c touch.c rm.c echo.c cat.c
+SOURCES  := halt.c loop.c touch.c rm.c echo.c cat.c shell.c
 
 OBJECTS  := $(patsubst %.c, %.o, $(SOURCES))
 TARGETS  := $(patsubst %.o, %, $(OBJECTS))

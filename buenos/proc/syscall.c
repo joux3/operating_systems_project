@@ -179,6 +179,11 @@ int remove_file(char* filename) {
 
 }
 
+int exec_process(char *filename) {
+    // TODO: safely copy filename from userland to kernel
+    return process_start(filename);
+}
+
 #endif
 
 /**
@@ -210,7 +215,7 @@ void syscall_handle(context_t *user_context)
         break;
     #ifdef CHANGED_2
         case SYSCALL_EXEC:
-            KERNEL_PANIC("Unhandled system call\n");
+            result = exec_process((char*)(user_context->cpu_regs[MIPS_REGISTER_A1]));
             break;
         case SYSCALL_EXIT:
             KERNEL_PANIC("Unhandled system call\n");
