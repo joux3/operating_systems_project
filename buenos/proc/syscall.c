@@ -142,8 +142,12 @@ int write_to_handle(int filehandle, void* buffer, int length) {
     } else if ((filehandle - 3) >= 0 && (filehandle - 3) < CONFIG_MAX_OPEN_FILES) {
         // TODO find filehandle if a file
         lock_acquire(process_filehandle_lock);
-        result = -1;
-        KERNEL_PANIC("Files not supported in syscall_write\n");
+        process_filehandle_t *handle_entry = &process_filehandle_table[filehandle - 3];
+        if (!handle_entry->in_use || handle_entry->owner == syscall_get_current_process()) {
+            result = vfs_write(handle_entry->vfs_handle, buffer, length);
+        } else {
+            result = -1;
+        }
         lock_release(process_filehandle_lock);
     } else {
         result = -1;
