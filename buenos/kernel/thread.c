@@ -86,32 +86,32 @@ void thread_table_init(void)
 
     /* Init all entries to 'NULL' */
     for (i=0; i<CONFIG_MAX_THREADS; i++) {
-    /* Set context pointers to the top of the stack*/
-    thread_table[i].context      = (context_t *) (thread_stack_areas
-        +CONFIG_THREAD_STACKSIZE*i + CONFIG_THREAD_STACKSIZE - 
-                              sizeof(context_t));
-    thread_table[i].user_context = NULL;
-    thread_table[i].state        = THREAD_FREE;
-    thread_table[i].sleeps_on    = 0;
-    thread_table[i].pagetable    = NULL;
-    thread_table[i].process_id   = -1;    
-    thread_table[i].next         = -1;    
-    #ifdef CHANGED_1
-    thread_table[i].sleeps_until = 0;
-    thread_table[i].priority = PRIORITY_NORMAL;
-    #endif
+        /* Set context pointers to the top of the stack*/
+        thread_table[i].context      = (context_t *) (thread_stack_areas
+            +CONFIG_THREAD_STACKSIZE*i + CONFIG_THREAD_STACKSIZE - 
+                                  sizeof(context_t));
+        thread_table[i].user_context = NULL;
+        thread_table[i].state        = THREAD_FREE;
+        thread_table[i].sleeps_on    = 0;
+        thread_table[i].pagetable    = NULL;
+        thread_table[i].process_id   = -1;    
+        thread_table[i].next         = -1;    
+        #ifdef CHANGED_1
+        thread_table[i].sleeps_until = 0;
+        thread_table[i].priority = PRIORITY_NORMAL;
+        #endif
     }
 
     thread_table[IDLE_THREAD_TID].context->cpu_regs[MIPS_REGISTER_SP] =
-    (uint32_t) thread_stack_areas + CONFIG_THREAD_STACKSIZE -4 -
-    sizeof(context_t);
+        (uint32_t) thread_stack_areas + CONFIG_THREAD_STACKSIZE -4 -
+        sizeof(context_t);
     thread_table[IDLE_THREAD_TID].context->pc = 
         (uint32_t) _idle_thread_wait_loop;
     thread_table[IDLE_THREAD_TID].context->status = 
         INTERRUPT_MASK_ALL | INTERRUPT_MASK_MASTER;
     thread_table[IDLE_THREAD_TID].state = THREAD_READY;
     thread_table[IDLE_THREAD_TID].context->prev_context =
-    thread_table[IDLE_THREAD_TID].context;
+        thread_table[IDLE_THREAD_TID].context;
 }
 
 

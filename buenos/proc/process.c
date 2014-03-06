@@ -214,7 +214,7 @@ void process_start(const char *executable)
        (including userland stack). Since we don't have proper tlb
        handling code, all these pages must fit into TLB. */
     KERNEL_ASSERT(elf.ro_pages + elf.rw_pages + CONFIG_USERLAND_STACK_SIZE
-          <= _tlb_get_maxindex() + 1);
+                  <= _tlb_get_maxindex() + 1);
 
     /* Allocate and map stack */
     for(i = 0; i < CONFIG_USERLAND_STACK_SIZE; i++) {
