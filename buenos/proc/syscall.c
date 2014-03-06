@@ -92,7 +92,9 @@ int open_file(char* filename) {
 int close_file(int filehandle) {
     int result;
     filehandle -= 3;
-    if (!process_filehandle_table[filehandle].in_use ||
+    if (filehandle < 0 || filehandle >= CONFIG_MAX_OPEN_FILES) { 
+        result = -1;
+    } else if (!process_filehandle_table[filehandle].in_use ||
         process_filehandle_table[filehandle].owner != syscall_get_current_process()) {
         result = -1;
     } else {
@@ -112,7 +114,7 @@ int read_from_handle(int filehandle, void* buffer, int length) {
     } else if (filehandle == FILEHANDLE_STDIN) {
         console = syscall_get_console_gcd();
         result = console->read(console, buffer, length);
-    } else {
+    } else if ((filehandle - 3) >= 0 && (filehandle - 3) < CONFIG_MAX_OPEN_FILES) { 
         lock_acquire(process_filehandle_lock);
         process_filehandle_t *handle_entry = &process_filehandle_table[filehandle - 3];
         if (!handle_entry->in_use || handle_entry->owner == syscall_get_current_process()) {
@@ -121,6 +123,8 @@ int read_from_handle(int filehandle, void* buffer, int length) {
             result = -1;
         }
         lock_release(process_filehandle_lock);
+    } else {
+      result = -1;
     }
     return result;
     // TODO safely copy from kernel buffer to userland
@@ -129,18 +133,20 @@ int read_from_handle(int filehandle, void* buffer, int length) {
 int write_to_handle(int filehandle, void* buffer, int length) {
     int result;
     gcd_t *console;
+    // TODO safely copy to kernel
     if (filehandle == FILEHANDLE_STDIN) {
         result = -1;
     } else if (filehandle == FILEHANDLE_STDOUT || filehandle == FILEHANDLE_STDERR) {
-        // TODO find filehandle if a file
-        // TODO safely copy to kernel
         console = syscall_get_console_gcd();
         result = console->write(console, buffer, length);
-    } else {
+    } else if ((filehandle - 3) >= 0 && (filehandle - 3) < CONFIG_MAX_OPEN_FILES) {
+        // TODO find filehandle if a file
         lock_acquire(process_filehandle_lock);
         result = -1;
         KERNEL_PANIC("Files not supported in syscall_write\n");
         lock_release(process_filehandle_lock);
+    } else {
+        result = -1;
     }
     return result;
 }
