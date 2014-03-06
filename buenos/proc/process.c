@@ -238,7 +238,6 @@ int process_start(const char *executable)
 
     lock_acquire(process_table_lock);
 
-    // TODO: find location for process from process table
     for (i = 0; i < CONFIG_MAX_PROCESS_COUNT; i++) {
         if (process_table[i].state == PROCESS_FREE) {
             process_id = i;
@@ -269,7 +268,16 @@ int process_start(const char *executable)
 
     file = vfs_open((char *)executable);
     /* Make sure the file existed and was a valid ELF file */
-    KERNEL_ASSERT(file >= 0);
+    if (file < 0) {
+        intr_status = _interrupt_disable();
+        my_entry->pagetable = original_pagetable;
+        _interrupt_set_state(intr_status);
+
+        tlb_fill(my_entry->pagetable);
+
+        lock_release(process_table_lock);
+        return -1;
+    }
     KERNEL_ASSERT(elf_parse_header(&elf, file));
 
     /* Trivial and naive sanity check for entry point: */
@@ -380,6 +388,8 @@ int process_start(const char *executable)
     process_table[process_id].parent = thread_get_current_process();
 
     lock_release(process_table_lock);
+
+    vfs_close(file);
 
     return process_id;
 }
