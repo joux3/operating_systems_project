@@ -221,8 +221,18 @@ int remove_file(char* filename) {
 }
 
 int exec_process(char *filename) {
-    // TODO: safely copy filename from userland to kernel
-    return process_start(filename);
+    char kernel_buffer[KERNEL_BUFFER_SIZE];
+    int status;
+
+    status = userland_to_kernel_strcpy(filename, kernel_buffer, sizeof(kernel_buffer));
+    DEBUG("kernel_memory", "copy status %d\n", status);
+    if(status == 0){
+        return -1;
+    }
+    else if(status < 0){
+        KERNEL_PANIC("should call process exit\n");
+    }
+    return process_start(kernel_buffer);
 }
 
 #endif
