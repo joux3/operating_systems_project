@@ -44,6 +44,8 @@
     #include "lib/debug.h"
     #include "drivers/tty.h"
     #include "drivers/device.h"
+    #include "vm/vm.h"
+    #include "vm/pagepool.h"
 
     #define KERNEL_BUFFER_SIZE 512
 
@@ -235,6 +237,76 @@ int exec_process(char *filename) {
     return process_start(kernel_buffer);
 }
 
+void exit_process(int retval) {
+    int i;
+    process_id_t current_process;
+    pagetable_t *pagetable;
+
+    current_process = thread_get_current_process();
+
+    lock_acquire(process_filehandle_lock);
+    for (i = 0; i < CONFIG_MAX_OPEN_FILES; i++) {
+        if (process_filehandle_table[i].in_use &&
+            process_filehandle_table[i].owner == current_process) {
+            vfs_close(process_filehandle_table[i].vfs_handle);
+            process_filehandle_table[i].in_use = 0;
+        }
+    }
+    lock_release(process_filehandle_lock);
+
+    lock_acquire(process_table_lock);
+    
+    process_table[current_process].retval = retval;
+    process_table[current_process].state = PROCESS_ZOMBIE;
+
+    // clean the child processes of this process
+    for (i = 0; i < CONFIG_MAX_PROCESS_COUNT; i++) {    
+        if (process_table[i].state == PROCESS_ZOMBIE && process_table[i].parent == current_process) {
+            process_table[i].state = PROCESS_FREE;
+        }
+    }
+
+    lock_release(process_table_lock);
+
+    condition_broadcast(process_zombie_cv);
+
+    pagetable = thread_get_current_thread_entry()->pagetable;
+    if (pagetable) {
+        for (i = 0; i < (int)pagetable->valid_count; i++) {
+            tlb_entry_t *entry = &pagetable->entries[i];
+            if (entry->V0) {
+                pagepool_free_phys_page(entry->PFN0 << 12); 
+            }
+            if (entry->V1) {
+                pagepool_free_phys_page(entry->PFN1 << 12);
+            }
+        }
+    }
+    vm_destroy_pagetable(pagetable);
+    thread_get_current_thread_entry()->pagetable = NULL;
+    
+    thread_finish();
+}
+
+int process_join(int process) {
+    int result;
+    if (process < 0 || process > CONFIG_MAX_PROCESS_COUNT) {
+        return -1;
+    }
+    lock_acquire(process_table_lock);
+    if ((process_table[process].state == PROCESS_RUNNING || process_table[process].state == PROCESS_ZOMBIE) &&
+        process_table[process].parent == thread_get_current_process()) {
+        while(process_table[process].state == PROCESS_RUNNING) {
+            condition_wait(process_zombie_cv, process_table_lock); 
+        } 
+        result = process_table[process].retval;
+    } else {
+        result = -2;
+    }
+    lock_release(process_table_lock);
+    return result;
+}
+
 #endif
 
 /**
@@ -269,10 +341,11 @@ void syscall_handle(context_t *user_context)
             result = exec_process((char*)(user_context->cpu_regs[MIPS_REGISTER_A1]));
             break;
         case SYSCALL_EXIT:
-            KERNEL_PANIC("Unhandled system call\n");
+            exit_process((int)user_context->cpu_regs[MIPS_REGISTER_A1]);
+            result = -1;
             break;
         case SYSCALL_JOIN:
-            KERNEL_PANIC("Unhandled system call\n");
+            result = process_join((int)user_context->cpu_regs[MIPS_REGISTER_A1]);
             break;
         case SYSCALL_OPEN:
             lock_acquire(process_filehandle_lock);
