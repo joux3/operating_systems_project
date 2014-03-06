@@ -268,7 +268,7 @@ int process_start(const char *executable)
 
     file = vfs_open((char *)executable);
     /* Make sure the file existed and was a valid ELF file */
-    if (file < 0) {
+    if (file < 0 || !elf_parse_header(&elf, file)) {
         intr_status = _interrupt_disable();
         my_entry->pagetable = original_pagetable;
         _interrupt_set_state(intr_status);
@@ -278,7 +278,6 @@ int process_start(const char *executable)
         lock_release(process_table_lock);
         return -1;
     }
-    KERNEL_ASSERT(elf_parse_header(&elf, file));
 
     /* Trivial and naive sanity check for entry point: */
     KERNEL_ASSERT(elf.entry_point >= PAGE_SIZE);
