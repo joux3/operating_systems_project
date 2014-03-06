@@ -96,10 +96,10 @@ void thread_table_init(void)
     thread_table[i].pagetable    = NULL;
     thread_table[i].process_id   = -1;    
     thread_table[i].next         = -1;    
-        #ifdef CHANGED_1
-            thread_table[i].sleeps_until = 0;
-            thread_table[i].priority = PRIORITY_NORMAL;
-        #endif
+    #ifdef CHANGED_1
+    thread_table[i].sleeps_until = 0;
+    thread_table[i].priority = PRIORITY_NORMAL;
+    #endif
     }
 
     thread_table[IDLE_THREAD_TID].context->cpu_regs[MIPS_REGISTER_SP] =

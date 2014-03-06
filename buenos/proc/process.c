@@ -90,24 +90,60 @@ void _kernel_to_userland_memcpy(void* mem, uint32_t lenmem, uint32_t* terminatin
 
 }
 */
-
-/* returns NULL if failure, otherwise dst */
-void* _userland_to_kernel_memcpy(void* src, void* dst, uint32_t lenmem)
+char* userland_to_kernel_strcpy(char* src, char* dst)
 {
 
     thread_table_t *my_entry;
-    void * retval;
+    char * retval;
     uint32_t i;
 
-    interrupt_status_t intr_status;
 
     my_entry = thread_get_current_thread_entry();
 
     /* check that we are currently not on copy status */
     KERNEL_ASSERT(my_entry->on_kernel_copy == 0);
 
-    intr_status = _interrupt_disable();
-    _interrupt_set_state(intr_status);
+
+    my_entry->on_kernel_copy = 1;
+
+
+    i = 0;
+    retval = dst;
+    while(src + i < (void*)USERLAND_STACK_TOP)
+    {
+        *(dst + i) = *(src + i);
+        if(my_entry->copy_error_status != 0)
+        {
+            break;
+        }
+        if(*(dst + i) == 0)
+        {
+            goto exit;
+        }
+        i++;
+    }
+    retval = NULL;
+    
+    exit:
+
+    my_entry->on_kernel_copy = 0;
+
+    
+    return retval;
+}
+
+/* returns NULL if failure, otherwise dst */
+void* userland_to_kernel_memcpy(void* src, void* dst, uint32_t lenmem)
+{
+
+    thread_table_t *my_entry;
+    void * retval;
+    uint32_t i;
+
+    my_entry = thread_get_current_thread_entry();
+
+    /* check that we are currently not on copy status */
+    KERNEL_ASSERT(my_entry->on_kernel_copy == 0);
 
     my_entry->on_kernel_copy = 1;
 
@@ -132,9 +168,8 @@ void* _userland_to_kernel_memcpy(void* src, void* dst, uint32_t lenmem)
     
     exit:
 
-    intr_status = _interrupt_enable();
-    _interrupt_set_state(intr_status);
-    
+    my_entry->on_kernel_copy = 0;
+
     return retval;
 }
 #endif
