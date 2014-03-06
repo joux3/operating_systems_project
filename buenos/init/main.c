@@ -161,8 +161,11 @@ void init_startup_thread(uint32_t arg)
 
     process_start(bootargs_get("initprog"));
 
+    #ifdef CHANGED_2
+    #else
     /* The current process_start() should never return. */
     KERNEL_PANIC("Run out of initprog.\n");
+    #endif
 }
 
 /* Whether other processors than 0 may continue in SMP mode.

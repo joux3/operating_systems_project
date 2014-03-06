@@ -126,6 +126,10 @@ void thread_switch(void);
     void thread_sleep(uint32_t sleep_ms);
 #endif
 
+#ifdef CHANGED_2
+    process_id_t thread_get_current_process(void);
+#endif
+
 void thread_goto_userland(context_t *usercontext);
 
 void thread_finish(void);

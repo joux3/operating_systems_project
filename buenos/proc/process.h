@@ -80,7 +80,11 @@ void process_init_process_table(void);
 
 #endif
 
+#ifdef CHANGED_2
+int process_start(const char *executable);
+#else
 void process_start(const char *executable);
+#endif
 
 #ifdef CHANGED_2
 

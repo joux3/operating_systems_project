@@ -50,10 +50,6 @@ gcd_t *syscall_get_console_gcd(void) {
     return (gcd_t*)device_get(YAMS_TYPECODE_TTY, 0)->generic_device;
 }
 
-process_id_t syscall_get_current_process(void) {
-    return thread_get_current_thread_entry()->process_id;
-}
-
 #endif
 
 #ifdef CHANGED_2
@@ -78,7 +74,7 @@ int open_file(char* filename) {
         if (openfile >= 0) {
             process_filehandle_table[i].in_use = 1;
             process_filehandle_table[i].vfs_handle = openfile;
-            process_filehandle_table[i].owner = syscall_get_current_process();
+            process_filehandle_table[i].owner = thread_get_current_process();
         } else {
             process_filehandle = -1;
         }
@@ -95,7 +91,7 @@ int close_file(int filehandle) {
     if (filehandle < 0 || filehandle >= CONFIG_MAX_OPEN_FILES) { 
         result = -1;
     } else if (!process_filehandle_table[filehandle].in_use ||
-        process_filehandle_table[filehandle].owner != syscall_get_current_process()) {
+        process_filehandle_table[filehandle].owner != thread_get_current_process()) {
         result = -1;
     } else {
         result = vfs_close(process_filehandle_table[filehandle].vfs_handle);
@@ -111,7 +107,7 @@ int seek_file(int filehandle, int pos) {
     if (filehandle < 0 || filehandle >= CONFIG_MAX_OPEN_FILES) { 
         result = -1;
     } else if (!process_filehandle_table[filehandle].in_use ||
-        process_filehandle_table[filehandle].owner != syscall_get_current_process()) {
+        process_filehandle_table[filehandle].owner != thread_get_current_process()) {
         result = -1;
     } else {
         result = vfs_seek(process_filehandle_table[filehandle].vfs_handle, pos);
@@ -131,7 +127,7 @@ int read_from_handle(int filehandle, void* buffer, int length) {
     } else if ((filehandle - 3) >= 0 && (filehandle - 3) < CONFIG_MAX_OPEN_FILES) { 
         lock_acquire(process_filehandle_lock);
         process_filehandle_t *handle_entry = &process_filehandle_table[filehandle - 3];
-        if (!handle_entry->in_use || handle_entry->owner == syscall_get_current_process()) {
+        if (!handle_entry->in_use || handle_entry->owner == thread_get_current_process()) {
             result = vfs_read(handle_entry->vfs_handle, buffer, length);
         } else {
             result = -1;
@@ -157,7 +153,7 @@ int write_to_handle(int filehandle, void* buffer, int length) {
         // TODO find filehandle if a file
         lock_acquire(process_filehandle_lock);
         process_filehandle_t *handle_entry = &process_filehandle_table[filehandle - 3];
-        if (!handle_entry->in_use || handle_entry->owner == syscall_get_current_process()) {
+        if (!handle_entry->in_use || handle_entry->owner == thread_get_current_process()) {
             result = vfs_write(handle_entry->vfs_handle, buffer, length);
         } else {
             result = -1;

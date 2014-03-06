@@ -365,6 +365,12 @@ void thread_switch(void)
     }
 #endif
 
+#ifdef CHANGED_2
+    process_id_t thread_get_current_process(void) {
+        return thread_get_current_thread_entry()->process_id;
+    }
+#endif
+
 /**
  * Return the TID of the calling thread. 
  * Finds out what is the TID of the thread calling this function.
