@@ -82,6 +82,13 @@ void process_init_process_table(void);
 
 void process_start(const char *executable);
 
+#ifdef CHANGED_2
+
+char* userland_to_kernel_strcpy(char* src, char* dst, uint32_t len);
+void* userland_to_kernel_memcpy(void* src, void* dst, uint32_t lenmem);
+
+#endif
+
 #define USERLAND_STACK_TOP 0x7fffeffc
 
 #endif

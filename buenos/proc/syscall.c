@@ -171,7 +171,10 @@ int write_to_handle(int filehandle, void* buffer, int length) {
 
 int create_file(char* filename, int size) {
     // TODO safely copy filename from userland to kernel
-    return vfs_create(filename, size);
+    char buffer[64];
+    if(userland_to_kernel_strcpy(filename, buffer, sizeof(buffer)))
+        return vfs_create(buffer, size);
+    return -1;
 }
 
 int remove_file(char* filename) {

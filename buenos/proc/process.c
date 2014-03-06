@@ -45,6 +45,10 @@
 #include "vm/vm.h"
 #include "vm/pagepool.h"
 
+#ifdef CHANGED_2
+#include "lib/debug.h"
+#endif 
+
 
 /** @name Process startup
  *
@@ -90,7 +94,7 @@ void _kernel_to_userland_memcpy(void* mem, uint32_t lenmem, uint32_t* terminatin
 
 }
 */
-char* userland_to_kernel_strcpy(char* src, char* dst)
+char* userland_to_kernel_strcpy(char* src, char* dst, uint32_t len)
 {
 
     thread_table_t *my_entry;
@@ -105,11 +109,13 @@ char* userland_to_kernel_strcpy(char* src, char* dst)
 
 
     my_entry->on_kernel_copy = 1;
+	
 
+    DEBUG("initprog", "starting strcpy\n");
 
     i = 0;
     retval = dst;
-    while(src + i < (void*)USERLAND_STACK_TOP)
+    while(i < len && src + i < (char*)USERLAND_STACK_TOP)
     {
         *(dst + i) = *(src + i);
         if(my_entry->copy_error_status != 0)
@@ -128,7 +134,6 @@ char* userland_to_kernel_strcpy(char* src, char* dst)
 
     my_entry->on_kernel_copy = 0;
 
-    
     return retval;
 }
 
