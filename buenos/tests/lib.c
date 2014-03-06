@@ -202,3 +202,28 @@ int strlen(const char *str) {
     }
     return len;
 }
+
+void itoa(int num, char *buf) {
+    if (num < 0) {
+        *(buf++) = '-';
+        num *= -1;
+    }
+
+    if (num == 0) {
+        *(buf++) = '0';
+    } else {
+        int div = 1;
+        while ((num / div) > 0) {
+            div *= 10;
+        }
+        div /= 10;
+        while (div >= 1) {
+            int d = num / div;
+            *(buf++) = '0' + d;
+            num -= d * div;
+            div /= 10;
+        }
+    }    
+
+    buf = '\0';
+}

@@ -15,7 +15,15 @@ int main(void) {
             if (buffer[i] == 13) {  
                 buffer[i] = '\0';
                 read = 0;
-                syscall_exec(buffer);
+                // TODO: parse & if we want to run in the background
+                prints("\n");
+                int pid = syscall_exec(buffer);
+                int retval = syscall_join(pid);
+                char retval_buf[64];
+                prints("return value: "); 
+                itoa(retval, retval_buf);
+                prints(retval_buf);
+                prints("\n");
             }
         }
     }
