@@ -225,5 +225,5 @@ void itoa(int num, char *buf) {
         }
     }    
 
-    buf = '\0';
+    *buf = '\0';
 }

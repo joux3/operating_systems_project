@@ -300,6 +300,7 @@ int process_join(int process) {
             condition_wait(process_zombie_cv, process_table_lock); 
         } 
         result = process_table[process].retval;
+        process_table[process].state = PROCESS_FREE;
     } else {
         result = -2;
     }
