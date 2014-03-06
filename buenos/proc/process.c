@@ -229,6 +229,15 @@ int process_start(const char *executable)
     int invalid;
 
     int i;
+ 
+    /*
+
+        jos rw/ro_addr ei oo page boundaryllä, varataanko tarpeeksi muistia?
+
+        jos rw/ro muistialueet menee samalle pagelle, mutta ei alueina paallekkain
+          -> ei saa koittaa mapata samaa virtuaalimuistipagea       
+
+*/
     
     interrupt_status_t intr_status;
 
