@@ -87,13 +87,13 @@ void _kernel_to_userland_memcpy(void* mem, uint32_t lenmem, uint32_t* terminatin
 
 }
 */
-char* userland_to_kernel_strcpy(char* src, char* dst, uint32_t len)
+/* returns positive if succes 0 if failure negative if excaption  direction > 0 if userland to kernel*/
+int kernel_strcpy(char* src, char* dst, uint32_t len, uint32_t direction)
 {
 
     thread_table_t *my_entry;
-    char * retval;
     uint32_t i;
-
+    char* userland_ptr;
 
     my_entry = thread_get_current_thread_entry();
 
@@ -103,42 +103,44 @@ char* userland_to_kernel_strcpy(char* src, char* dst, uint32_t len)
 
     my_entry->on_kernel_copy = 1;
 
-
-    DEBUG("initprog", "starting strcpy\n");
-
+    userland_ptr = direction ? src : dst;
+	
     i = 0;
-    retval = dst;
-    while(i < len && src + i < (char*)USERLAND_STACK_TOP)
+    while(i < len)
     {
+        if(userland_ptr + i >= (char*)USERLAND_STACK_TOP)
+        {
+            my_entry->on_kernel_copy = 0;
+            return -1;
+        }
         *(dst + i) = *(src + i);
         if(my_entry->copy_error_status != 0)
         {
-            break;
+            my_entry->on_kernel_copy = 0;
+            return -1;
         }
         if(*(dst + i) == 0)
         {
-            goto exit;
+            my_entry->on_kernel_copy = 0;
+            return i;
         }
         i++;
     }
-    retval = NULL;
-    
-    exit:
-
     my_entry->on_kernel_copy = 0;
-
-    return retval;
+    return 0;
 }
 
-/* returns NULL if failure, otherwise dst */
-void* userland_to_kernel_memcpy(void* src, void* dst, uint32_t lenmem)
+/* returns positive if succes 0 if failure negative if excaption */
+int kernel_memcpy(void* src, void* dst, uint32_t lenmem, uint32_t direction)
 {
 
     thread_table_t *my_entry;
-    void * retval;
     uint32_t i;
+    void * userland_ptr;
 
     my_entry = thread_get_current_thread_entry();
+
+    userland_ptr = direction ? src : dst;
 
     /* check that we are currently not on copy status */
     KERNEL_ASSERT(my_entry->on_kernel_copy == 0);
@@ -148,28 +150,43 @@ void* userland_to_kernel_memcpy(void* src, void* dst, uint32_t lenmem)
     for(i = 0; i < lenmem; i++)
     {
         /* if we are not on userland memory area return NULL */
-        if(src + i >= (void*)USERLAND_STACK_TOP)
+        if(userland_ptr + i >= (void*)USERLAND_STACK_TOP)
         {
-            retval = NULL;
-            goto exit;
+            my_entry->on_kernel_copy = 0;
+            return -1;
         }
         *(uint8_t*)(dst + i) = *(uint8_t*)(src + i);
         /*check if exception flags rise */  
         if(my_entry->copy_error_status != 0)
         {
-            retval = NULL;
-            goto exit;
+            my_entry->on_kernel_copy = 0;
+            return -1;
         }
     }
-    
-    retval = dst;
-    
-    exit:
-
     my_entry->on_kernel_copy = 0;
-
-    return retval;
+    return i;
 }
+
+int userland_to_kernel_strcpy(char* src, char* dst, uint32_t len)
+{
+    return kernel_strcpy(src, dst, len, 1);
+}
+
+int kernel_to_userland_strcpy(char* src, char* dst, uint32_t len)
+{
+    return kernel_strcpy(src, dst, len, 0);
+}
+
+int userland_to_kernel_memcpy(void* src, void* dst, uint32_t lenmem)
+{
+    return kernel_memcpy(src, dst, lenmem, 1);
+}
+
+int kernel_to_userland_memcpy(void* src, void* dst, uint32_t lenmem)
+{
+    return kernel_memcpy(src, dst, lenmem, 0);
+}
+
 #endif
 
 #ifdef CHANGED_2

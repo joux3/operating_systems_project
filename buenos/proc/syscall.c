@@ -45,6 +45,8 @@
     #include "drivers/tty.h"
     #include "drivers/device.h"
 
+    #define KERNEL_BUFFER_SIZE 512
+
 gcd_t *syscall_get_console_gcd(void) {
     // get first device (index 0) of type console
     return (gcd_t*)device_get(YAMS_TYPECODE_TTY, 0)->generic_device;
@@ -59,9 +61,18 @@ gcd_t *syscall_get_console_gcd(void) {
  */
 
 int open_file(char* filename) {
-    // TODO safely copy filename to kernel
-    int process_filehandle, i;
+    int process_filehandle, i, status;
+    char kernel_buffer[KERNEL_BUFFER_SIZE];
     openfile_t openfile;
+
+    status = userland_to_kernel_strcpy(filename, kernel_buffer, sizeof(kernel_buffer));
+    if(status == 0){
+        return -1;
+    }
+    else if(status < 0){
+        KERNEL_PANIC("should call process exit\n");
+    }
+
     process_filehandle = -1;
     for (i = 0; i < CONFIG_MAX_OPEN_FILES; i++) {
         if (!process_filehandle_table[i].in_use) {
@@ -70,7 +81,7 @@ int open_file(char* filename) {
         }
     } 
     if (process_filehandle >= 0) {
-        openfile = vfs_open(filename);
+        openfile = vfs_open(kernel_buffer);
         if (openfile >= 0) {
             process_filehandle_table[i].in_use = 1;
             process_filehandle_table[i].vfs_handle = openfile;
@@ -116,9 +127,16 @@ int seek_file(int filehandle, int pos) {
 }
 
 int read_from_handle(int filehandle, void* buffer, int length) {
-    // TODO: check that buffer is within user mapped region
-    int result;
+    int result, n;
+    uint8_t kernel_buffer[KERNEL_BUFFER_SIZE];
     gcd_t *console;
+
+    n = userland_to_kernel_memcpy(buffer, kernel_buffer, length < KERNEL_BUFFER_SIZE ? length : KERNEL_BUFFER_SIZE);
+    if(n < 0)
+    {
+        KERNEL_PANIC("should call process exit\n");
+    }
+
     if (filehandle == FILEHANDLE_STDOUT || filehandle == FILEHANDLE_STDERR) {
         result = -1;
     } else if (filehandle == FILEHANDLE_STDIN) {
@@ -137,24 +155,30 @@ int read_from_handle(int filehandle, void* buffer, int length) {
       result = -1;
     }
     return result;
-    // TODO safely copy from kernel buffer to userland
 }
 
 int write_to_handle(int filehandle, void* buffer, int length) {
-    int result;
+    int result, n;
+    uint8_t kernel_buffer[KERNEL_BUFFER_SIZE];
     gcd_t *console;
-    // TODO safely copy to kernel
+
+    n = userland_to_kernel_memcpy(buffer, kernel_buffer, length < KERNEL_BUFFER_SIZE ? length : KERNEL_BUFFER_SIZE);
+    if(n < 0)
+    {
+        KERNEL_PANIC("should call process exit\n");
+    }
+        
     if (filehandle == FILEHANDLE_STDIN) {
         result = -1;
     } else if (filehandle == FILEHANDLE_STDOUT || filehandle == FILEHANDLE_STDERR) {
         console = syscall_get_console_gcd();
-        result = console->write(console, buffer, length);
+        result = console->write(console, kernel_buffer, n);
     } else if ((filehandle - 3) >= 0 && (filehandle - 3) < CONFIG_MAX_OPEN_FILES) {
         // TODO find filehandle if a file
         lock_acquire(process_filehandle_lock);
         process_filehandle_t *handle_entry = &process_filehandle_table[filehandle - 3];
         if (!handle_entry->in_use || handle_entry->owner == thread_get_current_process()) {
-            result = vfs_write(handle_entry->vfs_handle, buffer, length);
+            result = vfs_write(handle_entry->vfs_handle, kernel_buffer, n);
         } else {
             result = -1;
         }
@@ -166,17 +190,34 @@ int write_to_handle(int filehandle, void* buffer, int length) {
 }
 
 int create_file(char* filename, int size) {
-    // TODO safely copy filename from userland to kernel
-    char buffer[64];
-    if(userland_to_kernel_strcpy(filename, buffer, sizeof(buffer)))
-        return vfs_create(buffer, size);
-    return -1;
+    char kernel_buffer[KERNEL_BUFFER_SIZE];
+    int status;
+
+    status = userland_to_kernel_strcpy(filename, kernel_buffer, sizeof(kernel_buffer));
+    DEBUG("kernel_memory", "copy status %d\n", status);
+    if(status == 0){
+        return -1;
+    }
+    else if(status < 0){
+        KERNEL_PANIC("should call process exit\n");
+    }
+    return vfs_create(kernel_buffer, size);
 }
 
-int remove_file(char* filename) {
-    // TODO safely copy filename from userland to kernel
-    return vfs_remove(filename);
 
+int remove_file(char* filename) {
+    char kernel_buffer[KERNEL_BUFFER_SIZE];
+    int status;
+
+    status = userland_to_kernel_strcpy(filename, kernel_buffer, sizeof(kernel_buffer));
+    DEBUG("kernel_memory", "copy status %d\n", status);
+    if(status == 0){
+        return -1;
+    }
+    else if(status < 0){
+        KERNEL_PANIC("should call process exit\n");
+    }
+    return vfs_remove(filename);
 }
 
 int exec_process(char *filename) {

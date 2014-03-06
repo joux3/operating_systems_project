@@ -88,8 +88,10 @@ void process_start(const char *executable);
 
 #ifdef CHANGED_2
 
-char* userland_to_kernel_strcpy(char* src, char* dst, uint32_t len);
-void* userland_to_kernel_memcpy(void* src, void* dst, uint32_t lenmem);
+int userland_to_kernel_strcpy(char* src, char* dst, uint32_t len);
+int kernel_to_userland_strcpy(char* src, char* dst, uint32_t len);
+int userland_to_kernel_memcpy(void* src, void* dst, uint32_t lenmem);
+int kernel_to_userland_memcpy(void* src, void* dst, uint32_t lenmem);
 
 #endif
 
