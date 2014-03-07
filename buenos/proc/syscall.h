@@ -54,6 +54,10 @@
 #define SYSCALL_CREATE 0x206
 #define SYSCALL_DELETE 0x207
 
+#ifdef CHANGED_2
+#define SYSCALL_EXECP 0x106
+#endif 
+
 /* When userland program reads or writes these already open files it
  * actually accesses the console.
  */

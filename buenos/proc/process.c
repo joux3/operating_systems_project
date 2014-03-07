@@ -79,15 +79,8 @@ void process_init_process_table(void) {
 #endif
 
 
-/* TODO Set thread copy flags when creating thread */
 #ifdef CHANGED_2
-/*
-void _kernel_to_userland_memcpy(void* mem, uint32_t lenmem, uint32_t* terminating_val)
-{
-
-}
-*/
-/* returns positive if succes 0 if failure negative if excaption  direction > 0 if userland to kernel*/
+/* returns positive if succes 0 if failure negative if exception  direction > 0 if userland to kernel*/
 int kernel_strcpy(char* src, char* dst, uint32_t len, uint32_t direction)
 {
 
@@ -130,7 +123,7 @@ int kernel_strcpy(char* src, char* dst, uint32_t len, uint32_t direction)
     return 0;
 }
 
-/* returns positive if succes 0 if failure negative if excaption */
+/* returns positive if succes 0 if failure negative if exception */
 int kernel_memcpy(void* src, void* dst, uint32_t lenmem, uint32_t direction)
 {
 
@@ -149,7 +142,7 @@ int kernel_memcpy(void* src, void* dst, uint32_t lenmem, uint32_t direction)
 
     for(i = 0; i < lenmem; i++)
     {
-        /* if we are not on userland memory area return NULL */
+        /* if we are not on userland memory area return negative */
         if(userland_ptr + i >= (void*)USERLAND_STACK_TOP)
         {
             my_entry->on_kernel_copy = 0;
@@ -198,11 +191,23 @@ void process_init(uint32_t entry_point) {
     DEBUG("processdebug", "in process_init, entrypoint %d\n", entry_point);
 
     my_entry = thread_get_current_thread_entry();
-
+    
     /* Initialize the user context. (Status register is handled by
        thread_goto_userland) */
     memoryset(&user_context, 0, sizeof(user_context));
-    user_context.cpu_regs[MIPS_REGISTER_SP] = USERLAND_STACK_TOP;
+
+    DEBUG("processdebug", "setting new regs\n");
+    /* pull out the extra arguments */
+    user_context.cpu_regs[MIPS_REGISTER_SP] = my_entry->context->cpu_regs[MIPS_REGISTER_A1];
+    user_context.cpu_regs[MIPS_REGISTER_A1] = my_entry->context->cpu_regs[MIPS_REGISTER_A1];
+    user_context.cpu_regs[MIPS_REGISTER_A0] = my_entry->context->cpu_regs[MIPS_REGISTER_A2];
+    DEBUG("processdebug", "argument string first entry %X\n", my_entry->context->cpu_regs[MIPS_REGISTER_A1]);
+
+    /*
+    my_entry->context->cpu_regs[MIPS_REGISTER_A1] = 0;
+    my_entry->context->cpu_regs[MIPS_REGISTER_A2] = 0;
+    */
+
     user_context.pc = entry_point;
 
     thread_goto_userland(&user_context);
@@ -216,6 +221,12 @@ void process_init(uint32_t entry_point) {
 
 int process_start(const char *executable)
 {
+    return process_start_args(executable, NULL, 0,0);
+
+}
+
+int process_start_args(const char *executable, void *arg_data, int arg_datalen, int arg_count )
+{
     thread_table_t *new_entry;
     thread_table_t *my_entry;
     TID_t thread_id;
@@ -228,7 +239,7 @@ int process_start(const char *executable)
     openfile_t file;
     int invalid;
 
-    int i;
+    int i, n;
  
     /*
 
@@ -260,7 +271,7 @@ int process_start(const char *executable)
         return -1;
     }
 
-    thread_id = thread_create(process_init, (uint32_t)elf.entry_point);
+    thread_id = thread_create(process_init, elf.entry_point);
     new_entry = &thread_table[thread_id];
     new_entry->process_id = process_id;
 
@@ -381,7 +392,22 @@ int process_start(const char *executable)
         pagetable->entries[i].ASID = thread_id;
     }
     // manually overwrite the arg to point to entry point
+    
     new_entry->context->cpu_regs[MIPS_REGISTER_A0] = elf.entry_point;
+    /* copy the arguments to userland stack and set registers */
+    n = kernel_to_userland_memcpy(arg_data, (void*)(USERLAND_STACK_TOP - arg_datalen), arg_datalen);
+    DEBUG("kernel_memory", "copy status %d\n", n);
+    if(n < 0){
+            KERNEL_PANIC("copying arguments to userland stack failed\n");
+    }
+    DEBUG("processdebug", "added arguments on top of the stack\n");
+    // force in some extra arguments 
+    // TODO find out a better way than this to pass these
+    // stack ptr 
+    new_entry->context->cpu_regs[MIPS_REGISTER_A1] = USERLAND_STACK_TOP - arg_datalen;
+    //arg count
+    new_entry->context->cpu_regs[MIPS_REGISTER_A2] = USERLAND_STACK_TOP - arg_count;
+    DEBUG("processdebug", "run new thread\n");
     thread_run(thread_id);
     
     // put the caller's TLB back
