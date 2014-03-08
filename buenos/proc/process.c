@@ -228,15 +228,6 @@ int process_start(const char *executable)
     int invalid;
 
     int i;
- 
-    /*
-
-        jos rw/ro_addr ei oo page boundaryllä, varataanko tarpeeksi muistia?
-
-        jos rw/ro muistialueet menee samalle pagelle, mutta ei alueina paallekkain
-          -> ei saa koittaa mapata samaa virtuaalimuistipagea       
-
-*/
     
     interrupt_status_t intr_status;
 
@@ -327,11 +318,31 @@ int process_start(const char *executable)
     }
 
     for(i = 0; i < (int)elf.rw_pages; i++) {
-        phys_page = pagepool_get_phys_page();
-        KERNEL_ASSERT(phys_page != 0);
-        DEBUG("processdebug", "mapping %x -> %x\n", elf.ro_vaddr + i*PAGE_SIZE, phys_page);
-        vm_map(new_entry->pagetable, phys_page, 
-               elf.rw_vaddr + i*PAGE_SIZE, 1);
+        // elf segments might have overlapped just enough to be on the same virtual page
+        // so make sure we're not mapping them again
+        int j;   
+        int mapped = 0;
+        for (j = 0; j < (int)new_entry->pagetable->valid_count; j++) {
+            tlb_entry_t *tlb_entry = &new_entry->pagetable->entries[j];
+            if (tlb_entry->VPN2 == ((elf.rw_vaddr + i*PAGE_SIZE) >> 13)) {
+                if (ADDR_IS_ON_EVEN_PAGE(elf.rw_vaddr + i*PAGE_SIZE)) {
+                    mapped = tlb_entry->V0;
+                    break;
+                } else {
+                    mapped = tlb_entry->V1;
+                    break;
+                }
+            }
+        }
+        if (!mapped) {
+            phys_page = pagepool_get_phys_page();
+            KERNEL_ASSERT(phys_page != 0);
+            DEBUG("processdebug", "mapping %x -> %x\n", elf.rw_vaddr + i*PAGE_SIZE, phys_page);
+            vm_map(new_entry->pagetable, phys_page, 
+                   elf.rw_vaddr + i*PAGE_SIZE, 1);
+        } else {
+            DEBUG("processdebug", "skipping already mapped %x\n", elf.rw_vaddr + i*PAGE_SIZE);
+        }
     }
 
     DEBUG("processdebug", "filling tlb for new process\n");
@@ -382,6 +393,10 @@ int process_start(const char *executable)
     /* Set the dirty bit to zero (read-only) on read-only pages. */
     for(i = 0; i < (int)elf.ro_pages; i++) {
         vm_set_dirty(new_entry->pagetable, elf.ro_vaddr + i*PAGE_SIZE, 0);
+    }
+    // also write dirty bits for read-write pages as those might overlap ro pages
+    for(i = 0; i < (int)elf.rw_pages; i++) {
+        vm_set_dirty(new_entry->pagetable, elf.rw_vaddr + i*PAGE_SIZE, 1);
     }
 
     // set asid for pagetable on new thread

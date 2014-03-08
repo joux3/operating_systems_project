@@ -47,11 +47,13 @@
  * @{
  */
 
-
+#ifdef CHANGED_2
+#else
 /* Check whether given (virtual) address is even or odd mapping
    in a pair of mappings for TLB. */
 #define ADDR_IS_ON_ODD_PAGE(addr)  ((addr) & 0x00001000)  
 #define ADDR_IS_ON_EVEN_PAGE(addr) (!((addr) & 0x00001000))  
+#endif
 
 
 /**
