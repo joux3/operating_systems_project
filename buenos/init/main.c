@@ -142,6 +142,9 @@ void init_startup_fallback(void) {
 
 void init_startup_thread(uint32_t arg)
 {
+    #ifdef CHANGED_2
+        int pid;
+    #endif
     /* Threads have arguments for functions they run, we don't
        need any. Silence the compiler warning by using the argument. */
     arg = arg;
@@ -159,10 +162,15 @@ void init_startup_thread(uint32_t arg)
 
     kprintf("Starting initial program '%s'\n", bootargs_get("initprog"));
 
-    process_start(bootargs_get("initprog"));
 
     #ifdef CHANGED_2
+    pid = process_start(bootargs_get("initprog"));
+    if (pid < 0) {
+        kprintf("Failed to start the initial program.\n");
+        halt_kernel();
+    }
     #else
+    process_start(bootargs_get("initprog"));
     /* The current process_start() should never return. */
     KERNEL_PANIC("Run out of initprog.\n");
     #endif

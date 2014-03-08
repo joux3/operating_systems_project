@@ -36,6 +36,9 @@
 #include "proc/elf.h"
 #include "lib/libc.h"
 #include "drivers/yams.h"
+#ifdef CHANGED_2
+    #include "lib/debug.h"
+#endif
 
 /** @name ELF loader.
  *
@@ -65,6 +68,9 @@ int elf_parse_header(elf_info_t *elf, openfile_t file)
     int segs = 0;
     #if CHANGED_2
         int valid_entry_point = 0;
+        char buffer[256];
+        uint32_t elf_size = 0;
+        int last_read;
     #endif
 #define SEG_RO 1
 #define SEG_RW 2
@@ -190,6 +196,31 @@ int elf_parse_header(elf_info_t *elf, openfile_t file)
         }
         if (!valid_entry_point)
             return 0;
+
+        // validate ro_vaddr and rw_vaddr
+        DEBUG("elfdebug", "Validating segment virtual memory areas\n");
+        if ((segs & SEG_RO) && (elf->ro_vaddr < PAGE_SIZE || (elf->ro_vaddr + elf->ro_size) >= USERLAND_STACK_TOP)) {
+            return 0;
+        }
+        if ((segs & SEG_RW) && (elf->rw_vaddr < PAGE_SIZE || (elf->rw_vaddr + elf->rw_size) >= USERLAND_STACK_TOP)) {
+            return 0;
+        }
+
+        DEBUG("elfdebug", "Validating segment presence in elf file\n");
+        // calculate file size
+        vfs_seek(file, 0);
+        while((last_read = vfs_read(file, (void*)buffer, 256)) != 0) {
+            elf_size += last_read;
+        }
+        DEBUG("elfdebug", "Elf file size %d\n", elf_size);
+        // validate that the elf segments can actually be found
+        if ((segs & SEG_RO) && ((elf->ro_location + elf->ro_size) > elf_size)) {
+            return 0;
+        }
+        if ((segs & SEG_RW) && ((elf->rw_location + elf->rw_size) > elf_size)) {
+            return 0;
+        }
+        DEBUG("elfdebug", "Validated segment presence\n");
     #endif
     
 
