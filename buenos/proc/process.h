@@ -73,6 +73,7 @@ typedef struct {
     openfile_t vfs_handle; 
 } process_filehandle_t;
 
+
 process_filehandle_t process_filehandle_table[CONFIG_MAX_OPEN_FILES];
 lock_t *process_filehandle_lock;
 
@@ -81,6 +82,7 @@ void process_init_process_table(void);
 #endif
 
 #ifdef CHANGED_2
+int process_start_args(const char *executable, void *arg_data, int arg_datalen, int arg_count);
 int process_start(const char *executable);
 #else
 void process_start(const char *executable);

@@ -36,7 +36,7 @@
 # $Id: Makefile,v 1.6 2005/05/09 00:05:44 jaatroko Exp $
 
 # Add your _userland_ program sources to this variable:
-SOURCES  := halt.c loop.c touch.c rm.c echo.c cat.c shell.c illegalpointer.c
+SOURCES  := halt.c loop.c touch.c rm.c echo.c cat.c shell.c illegalpointer.c execptest.c argcat.c
 
 OBJECTS  := $(patsubst %.c, %.o, $(SOURCES))
 TARGETS  := $(patsubst %.o, %, $(OBJECTS))
@@ -45,13 +45,14 @@ TARGETS  := $(patsubst %.o, %, $(OBJECTS))
 # the pre-requisites list (or object files list).
 SYSLIBS := crt.o _syscall.o lib.o
 
+
 # Compiler configuration
 CC      := mips-elf-gcc
 AS      := mips-elf-as
 LD      := mips-elf-ld
-CFLAGS  += -G0 -I.. -Wall -W -Werror
+CFLAGS  += -G0 -I.. -Wall -W -Werror 
 LDFLAGS := --script=ld.userland.script --cref -s -G0
-ASFLAGS := -I.. -Wa,-mips32
+ASFLAGS := -I.. -Wa,-mips32 
 
 # -G0 is needed to avoid GP optimization (LD won't link if it is used)
 
