@@ -145,9 +145,16 @@ int elf_parse_header(elf_info_t *elf, openfile_t file)
                 elf->rw_location = program_hdr.p_offset;
                 elf->rw_size = program_hdr.p_filesz;
                 elf->rw_vaddr = program_hdr.p_vaddr;
+                #ifdef CHANGED_2
+                // if we're not on page boundary, we need one extra page
+                elf->rw_pages = 
+                    ((program_hdr.p_memsz + PAGE_SIZE - 1) / PAGE_SIZE) + 
+                    (((program_hdr.p_vaddr & ~0xfff) == program_hdr.p_vaddr) ? 0 : 1);
+                #else
                 /* memory size rounded up to the page boundary, in pages */
                 elf->rw_pages = 
                     (program_hdr.p_memsz + PAGE_SIZE - 1) / PAGE_SIZE;
+                #endif
 
             /* The RO segment */
             } else {
@@ -159,9 +166,16 @@ int elf_parse_header(elf_info_t *elf, openfile_t file)
                 elf->ro_location = program_hdr.p_offset;
                 elf->ro_size = program_hdr.p_filesz;
                 elf->ro_vaddr = program_hdr.p_vaddr;
+                #ifdef CHANGED_2
+                // if we're not on page boundary, we need one extra page
+                elf->ro_pages = 
+                    ((program_hdr.p_memsz + PAGE_SIZE - 1) / PAGE_SIZE) + 
+                    (((program_hdr.p_vaddr & ~0xfff) == program_hdr.p_vaddr) ? 0 : 1);
+                #else
                 /* memory size rounded up to the page boundary, in pages */
                 elf->ro_pages = 
                     (program_hdr.p_memsz + PAGE_SIZE - 1) / PAGE_SIZE;
+                #endif
             }
 
             break;

@@ -329,6 +329,7 @@ int process_start(const char *executable)
     for(i = 0; i < (int)elf.rw_pages; i++) {
         phys_page = pagepool_get_phys_page();
         KERNEL_ASSERT(phys_page != 0);
+        DEBUG("processdebug", "mapping %x -> %x\n", elf.ro_vaddr + i*PAGE_SIZE, phys_page);
         vm_map(new_entry->pagetable, phys_page, 
                elf.rw_vaddr + i*PAGE_SIZE, 1);
     }
