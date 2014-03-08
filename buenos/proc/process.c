@@ -262,7 +262,7 @@ int process_start(const char *executable)
     thread_id = thread_create(process_init, (uint32_t)elf.entry_point);
     if (thread_id < 0) {
         lock_release(process_table_lock);
-        return -1;
+        return -2;
     }
   
     new_entry = &thread_table[thread_id];
@@ -296,7 +296,11 @@ int process_start(const char *executable)
         my_entry->pagetable = original_pagetable;
         _interrupt_set_state(intr_status);
 
+        new_entry->state = THREAD_FREE;
+
         tlb_fill(my_entry->pagetable);
+
+        vm_destroy_pagetable(pagetable);
 
         lock_release(process_table_lock);
         return -1;
