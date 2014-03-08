@@ -260,6 +260,11 @@ int process_start(const char *executable)
     }
 
     thread_id = thread_create(process_init, (uint32_t)elf.entry_point);
+    if (thread_id < 0) {
+        lock_release(process_table_lock);
+        return -1;
+    }
+  
     new_entry = &thread_table[thread_id];
     new_entry->process_id = process_id;
 
