@@ -204,17 +204,15 @@ void process_init(uint32_t entry_point) {
     DEBUG("processdebug", " stack ptr %X\n", argv);
     for(i = 0; i < argc; i++)
     {
-        DEBUG("processdebug", " %u argument %s\n", i , (((char**)argv)[i]));
+        DEBUG("processdebug", " %u, 0x%x argument %s\n", i, (((char**)argv)[i]), (((char**)argv)[i]));
 
     }
     /* pull out the extra arguments */
-    user_context.cpu_regs[MIPS_REGISTER_SP] = (uint32_t)argv;
+    user_context.cpu_regs[MIPS_REGISTER_SP] = (uint32_t)(argv - 2*sizeof(void*));
     user_context.cpu_regs[MIPS_REGISTER_A0] = (uint32_t)argc;
     user_context.cpu_regs[MIPS_REGISTER_A1] = (uint32_t)argv;
 
     DEBUG("processdebug", "set arguments\n", argv);
-    my_entry->context->cpu_regs[MIPS_REGISTER_A1] = 0;
-    my_entry->context->cpu_regs[MIPS_REGISTER_A2] = 0;
 
     user_context.pc = entry_point;
 
@@ -434,7 +432,7 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
     new_entry->context->cpu_regs[MIPS_REGISTER_A0] = elf.entry_point;
     /* copy the arguments to userland stack and set registers */
     
-    /* set new stacktop on word boundary */
+    /* set new stacktop on under arguments */
     stack_top = ((USERLAND_STACK_TOP - arg_datalen) & (~3));
 
     void* ptr_kernel = arg_data;
