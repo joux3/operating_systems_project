@@ -5,9 +5,14 @@ char readbuffer[5];
 int linelength; 
 char retval_buf[64];
 
+char *argv[64];
+
 void run_linebuffer() {
     int i;
     int startbg = 0;
+    int argc = 1;
+
+    argv[0] = linebuffer;
 
     for (i = 0; i < linelength; i++) {
         if (linebuffer[i] == '&') {
@@ -15,19 +20,26 @@ void run_linebuffer() {
         } 
     }
 
-    int j;
     linebuffer[linelength++] = '\0';
     prints("\n");
-    // TODO: parse parameters properly
-    for (j = 0; j < i; j++) {
-        if (linebuffer[j] == ' ') {
-            linebuffer[j] = 0;
+
+    for (i = 1; i < linelength; i++) {
+        if (linebuffer[i] == ' ') {
+            linebuffer[i] = '\0';
+        } else if (linebuffer[i - 1] == '\0' && argc < 64) {
+            argv[argc++] = &linebuffer[i];
         }
     }
 
     linelength = 0;
+    /*
+    prints("argv:\n");
+    for (i = 0; i < argc; i++) {
+        prints(argv[i]);
+        prints("\n");
+    }*/
 
-    int pid = syscall_exec(linebuffer);
+    int pid = syscall_execp(linebuffer, argc, (const char**)argv);
     if (pid < 0) {
         prints("failed to start process: "); 
         itoa(pid, retval_buf);
@@ -59,15 +71,17 @@ int main(void) {
         deletedchars = 0;
         for (i = 0; i < read; i++) {
             if (readbuffer[i] == 127) {
+                // backspace
                 if (linelength > 0) {
                     linelength--;
                     deletedchars++;
                 }
             } else if (readbuffer[i] == 13) {
+                // enter
                 runcommand = 1;
                 break;
             } else {
-                if (linelength < 511) {
+                if (linelength < 511 && (linelength != 0 || readbuffer[i] != ' ')) {
                     linebuffer[linelength++] = readbuffer[i];
                 }
             }
