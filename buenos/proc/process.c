@@ -90,7 +90,6 @@ void _kernel_to_userland_memcpy(void* mem, uint32_t lenmem, uint32_t* terminatin
 /* returns positive if succes 0 if failure negative if excaption  direction > 0 if userland to kernel*/
 int kernel_strcpy(char* src, char* dst, uint32_t len, uint32_t direction)
 {
-
     thread_table_t *my_entry;
     uint32_t i;
     char* userland_ptr;
@@ -104,7 +103,7 @@ int kernel_strcpy(char* src, char* dst, uint32_t len, uint32_t direction)
     my_entry->on_kernel_copy = 1;
 
     userland_ptr = direction ? src : dst;
-	
+    
     i = 0;
     while(i < len)
     {

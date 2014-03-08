@@ -42,6 +42,7 @@
 
 #if CHANGED_2
 #include "kernel/thread.h"
+#include "lib/debug.h"
 #endif
 
 /**
@@ -87,11 +88,12 @@ void kernel_exception_handle(int exception)
     #ifdef CHANGED_2
     thread_table_t *my_entry;
 
-    my_entry= thread_get_current_thread_entry();
+    my_entry = thread_get_current_thread_entry();
 
     if(my_entry->on_kernel_copy)
     {
         my_entry->copy_error_status = exception;
+        DEBUG("kernel_memory", "exception while in kernel<->userland copying\n");
         goto exit;
     }
     #endif

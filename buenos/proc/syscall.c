@@ -54,188 +54,9 @@ gcd_t *syscall_get_console_gcd(void) {
     return (gcd_t*)device_get(YAMS_TYPECODE_TTY, 0)->generic_device;
 }
 
-#endif
-
-#ifdef CHANGED_2
-
 /**
  * Syscall handler functions
  */
-
-int open_file(char* filename) {
-    int process_filehandle, i, status;
-    char kernel_buffer[KERNEL_BUFFER_SIZE];
-    openfile_t openfile;
-
-    status = userland_to_kernel_strcpy(filename, kernel_buffer, sizeof(kernel_buffer));
-    if(status == 0){
-        return -1;
-    }
-    else if(status < 0){
-        KERNEL_PANIC("should call process exit\n");
-    }
-
-    process_filehandle = -1;
-    for (i = 0; i < CONFIG_MAX_OPEN_FILES; i++) {
-        if (!process_filehandle_table[i].in_use) {
-            process_filehandle = i;
-            break;
-        }
-    } 
-    if (process_filehandle >= 0) {
-        openfile = vfs_open(kernel_buffer);
-        if (openfile >= 0) {
-            process_filehandle_table[i].in_use = 1;
-            process_filehandle_table[i].vfs_handle = openfile;
-            process_filehandle_table[i].owner = thread_get_current_process();
-        } else {
-            process_filehandle = -1;
-        }
-    } 
-    if (process_filehandle >= 0) {
-        process_filehandle += 3;
-    }
-    return process_filehandle;
-}
-
-int close_file(int filehandle) {
-    int result;
-    filehandle -= 3;
-    if (filehandle < 0 || filehandle >= CONFIG_MAX_OPEN_FILES) { 
-        result = -1;
-    } else if (!process_filehandle_table[filehandle].in_use ||
-        process_filehandle_table[filehandle].owner != thread_get_current_process()) {
-        result = -1;
-    } else {
-        result = vfs_close(process_filehandle_table[filehandle].vfs_handle);
-        // Lazy deletion
-        process_filehandle_table[filehandle].in_use = 0;
-    }
-    return result;
-}
-
-int seek_file(int filehandle, int pos) {
-    int result;
-    filehandle -= 3;
-    if (filehandle < 0 || filehandle >= CONFIG_MAX_OPEN_FILES) { 
-        result = -1;
-    } else if (!process_filehandle_table[filehandle].in_use ||
-        process_filehandle_table[filehandle].owner != thread_get_current_process()) {
-        result = -1;
-    } else {
-        result = vfs_seek(process_filehandle_table[filehandle].vfs_handle, pos);
-    }
-    return result;
-}
-
-int read_from_handle(int filehandle, void* buffer, int length) {
-    int result, n;
-    uint8_t kernel_buffer[KERNEL_BUFFER_SIZE];
-    gcd_t *console;
-
-    n = userland_to_kernel_memcpy(buffer, kernel_buffer, length < KERNEL_BUFFER_SIZE ? length : KERNEL_BUFFER_SIZE);
-    if(n < 0)
-    {
-        KERNEL_PANIC("should call process exit\n");
-    }
-
-    if (filehandle == FILEHANDLE_STDOUT || filehandle == FILEHANDLE_STDERR) {
-        result = -1;
-    } else if (filehandle == FILEHANDLE_STDIN) {
-        console = syscall_get_console_gcd();
-        result = console->read(console, buffer, length);
-    } else if ((filehandle - 3) >= 0 && (filehandle - 3) < CONFIG_MAX_OPEN_FILES) { 
-        lock_acquire(process_filehandle_lock);
-        process_filehandle_t *handle_entry = &process_filehandle_table[filehandle - 3];
-        if (!handle_entry->in_use || handle_entry->owner == thread_get_current_process()) {
-            result = vfs_read(handle_entry->vfs_handle, buffer, length);
-        } else {
-            result = -1;
-        }
-        lock_release(process_filehandle_lock);
-    } else {
-      result = -1;
-    }
-    return result;
-}
-
-int write_to_handle(int filehandle, void* buffer, int length) {
-    int result, n;
-    uint8_t kernel_buffer[KERNEL_BUFFER_SIZE];
-    gcd_t *console;
-
-    n = userland_to_kernel_memcpy(buffer, kernel_buffer, length < KERNEL_BUFFER_SIZE ? length : KERNEL_BUFFER_SIZE);
-    if(n < 0)
-    {
-        KERNEL_PANIC("should call process exit\n");
-    }
-        
-    if (filehandle == FILEHANDLE_STDIN) {
-        result = -1;
-    } else if (filehandle == FILEHANDLE_STDOUT || filehandle == FILEHANDLE_STDERR) {
-        console = syscall_get_console_gcd();
-        result = console->write(console, kernel_buffer, n);
-    } else if ((filehandle - 3) >= 0 && (filehandle - 3) < CONFIG_MAX_OPEN_FILES) {
-        // TODO find filehandle if a file
-        lock_acquire(process_filehandle_lock);
-        process_filehandle_t *handle_entry = &process_filehandle_table[filehandle - 3];
-        if (!handle_entry->in_use || handle_entry->owner == thread_get_current_process()) {
-            result = vfs_write(handle_entry->vfs_handle, kernel_buffer, n);
-        } else {
-            result = -1;
-        }
-        lock_release(process_filehandle_lock);
-    } else {
-        result = -1;
-    }
-    return result;
-}
-
-int create_file(char* filename, int size) {
-    char kernel_buffer[KERNEL_BUFFER_SIZE];
-    int status;
-
-    status = userland_to_kernel_strcpy(filename, kernel_buffer, sizeof(kernel_buffer));
-    DEBUG("kernel_memory", "copy status %d\n", status);
-    if(status == 0){
-        return -1;
-    }
-    else if(status < 0){
-        KERNEL_PANIC("should call process exit\n");
-    }
-    return vfs_create(kernel_buffer, size);
-}
-
-
-int remove_file(char* filename) {
-    char kernel_buffer[KERNEL_BUFFER_SIZE];
-    int status;
-
-    status = userland_to_kernel_strcpy(filename, kernel_buffer, sizeof(kernel_buffer));
-    DEBUG("kernel_memory", "copy status %d\n", status);
-    if(status == 0){
-        return -1;
-    }
-    else if(status < 0){
-        KERNEL_PANIC("should call process exit\n");
-    }
-    return vfs_remove(filename);
-}
-
-int exec_process(char *filename) {
-    char kernel_buffer[KERNEL_BUFFER_SIZE];
-    int status;
-
-    status = userland_to_kernel_strcpy(filename, kernel_buffer, sizeof(kernel_buffer));
-    DEBUG("kernel_memory", "copy status %d\n", status);
-    if(status == 0){
-        return -1;
-    }
-    else if(status < 0){
-        KERNEL_PANIC("should call process exit\n");
-    }
-    return process_start(kernel_buffer);
-}
 
 void exit_process(int retval) {
     int i;
@@ -243,6 +64,8 @@ void exit_process(int retval) {
     pagetable_t *pagetable;
 
     current_process = thread_get_current_process();
+
+    DEBUG("processdebug", "process %d exit\n", current_process);
 
     lock_acquire(process_filehandle_lock);
     for (i = 0; i < CONFIG_MAX_OPEN_FILES; i++) {
@@ -286,6 +109,190 @@ void exit_process(int retval) {
     thread_get_current_thread_entry()->pagetable = NULL;
     
     thread_finish();
+
+    KERNEL_PANIC("Shouldn't reach here...");
+}
+
+
+int open_file(char* filename) {
+    int process_filehandle, i, status;
+    char kernel_buffer[KERNEL_BUFFER_SIZE];
+    openfile_t openfile;
+
+    status = userland_to_kernel_strcpy(filename, kernel_buffer, sizeof(kernel_buffer));
+    if (status == 0) {
+        return -1;
+    } else if (status < 0){
+        exit_process(128);
+    }
+
+    lock_acquire(process_filehandle_lock);
+
+    process_filehandle = -1;
+    for (i = 0; i < CONFIG_MAX_OPEN_FILES; i++) {
+        if (!process_filehandle_table[i].in_use) {
+            process_filehandle = i;
+            break;
+        }
+    } 
+    if (process_filehandle >= 0) {
+        openfile = vfs_open(kernel_buffer);
+        if (openfile >= 0) {
+            process_filehandle_table[i].in_use = 1;
+            process_filehandle_table[i].vfs_handle = openfile;
+            process_filehandle_table[i].owner = thread_get_current_process();
+        } else {
+            process_filehandle = -1;
+        }
+    } 
+    if (process_filehandle >= 0) {
+        process_filehandle += 3;
+    }
+    
+    lock_release(process_filehandle_lock);
+    return process_filehandle;
+}
+
+int close_file(int filehandle) {
+    int result;
+    lock_acquire(process_filehandle_lock);
+    filehandle -= 3;
+    if (filehandle < 0 || filehandle >= CONFIG_MAX_OPEN_FILES) { 
+        result = -1;
+    } else if (!process_filehandle_table[filehandle].in_use ||
+        process_filehandle_table[filehandle].owner != thread_get_current_process()) {
+        result = -1;
+    } else {
+        result = vfs_close(process_filehandle_table[filehandle].vfs_handle);
+        // Lazy deletion
+        process_filehandle_table[filehandle].in_use = 0;
+    }
+    lock_release(process_filehandle_lock);
+    return result;
+}
+
+int seek_file(int filehandle, int pos) {
+    int result;
+    lock_acquire(process_filehandle_lock);
+    filehandle -= 3;
+    if (filehandle < 0 || filehandle >= CONFIG_MAX_OPEN_FILES) { 
+        result = -1;
+    } else if (!process_filehandle_table[filehandle].in_use ||
+        process_filehandle_table[filehandle].owner != thread_get_current_process()) {
+        result = -1;
+    } else {
+        result = vfs_seek(process_filehandle_table[filehandle].vfs_handle, pos);
+    }
+    lock_release(process_filehandle_lock);
+    return result;
+}
+
+int read_from_handle(int filehandle, void* buffer, int length) {
+    int result, n;
+    uint8_t kernel_buffer[KERNEL_BUFFER_SIZE];
+    gcd_t *console;
+
+    n = userland_to_kernel_memcpy(buffer, kernel_buffer, length < KERNEL_BUFFER_SIZE ? length : KERNEL_BUFFER_SIZE);
+    if (n < 0)
+    {
+        exit_process(128);
+    }
+
+    if (filehandle == FILEHANDLE_STDOUT || filehandle == FILEHANDLE_STDERR) {
+        result = -1;
+    } else if (filehandle == FILEHANDLE_STDIN) {
+        console = syscall_get_console_gcd();
+        result = console->read(console, buffer, length);
+    } else if ((filehandle - 3) >= 0 && (filehandle - 3) < CONFIG_MAX_OPEN_FILES) { 
+        lock_acquire(process_filehandle_lock);
+        process_filehandle_t *handle_entry = &process_filehandle_table[filehandle - 3];
+        if (!handle_entry->in_use || handle_entry->owner == thread_get_current_process()) {
+            result = vfs_read(handle_entry->vfs_handle, buffer, length);
+        } else {
+            result = -1;
+        }
+        lock_release(process_filehandle_lock);
+    } else {
+      result = -1;
+    }
+    return result;
+}
+
+int write_to_handle(int filehandle, void* buffer, int length) {
+    int result, n;
+    uint8_t kernel_buffer[KERNEL_BUFFER_SIZE];
+    gcd_t *console;
+
+    n = userland_to_kernel_memcpy(buffer, kernel_buffer, length < KERNEL_BUFFER_SIZE ? length : KERNEL_BUFFER_SIZE);
+    if (n < 0)
+    {
+        exit_process(128);
+    } else if (n == 0) {
+        KERNEL_PANIC("Kernel output too small in write_to_handle?!");
+    }
+        
+    if (filehandle == FILEHANDLE_STDIN) {
+        result = -1;
+    } else if (filehandle == FILEHANDLE_STDOUT || filehandle == FILEHANDLE_STDERR) {
+        console = syscall_get_console_gcd();
+        result = console->write(console, kernel_buffer, n);
+    } else if ((filehandle - 3) >= 0 && (filehandle - 3) < CONFIG_MAX_OPEN_FILES) {
+        lock_acquire(process_filehandle_lock);
+        process_filehandle_t *handle_entry = &process_filehandle_table[filehandle - 3];
+        if (!handle_entry->in_use || handle_entry->owner == thread_get_current_process()) {
+            result = vfs_write(handle_entry->vfs_handle, kernel_buffer, n);
+        } else {
+            result = -1;
+        }
+        lock_release(process_filehandle_lock);
+    } else {
+        result = -1;
+    }
+    return result;
+}
+
+int create_file(char* filename, int size) {
+    char kernel_buffer[KERNEL_BUFFER_SIZE];
+    int status;
+
+    status = userland_to_kernel_strcpy(filename, kernel_buffer, sizeof(kernel_buffer));
+    DEBUG("kernel_memory", "copy status %d\n", status);
+    if (status == 0) {
+        return -1;
+    } else if (status < 0) {
+        exit_process(128);
+    }
+    return vfs_create(kernel_buffer, size);
+}
+
+
+int remove_file(char* filename) {
+    char kernel_buffer[KERNEL_BUFFER_SIZE];
+    int status;
+
+    status = userland_to_kernel_strcpy(filename, kernel_buffer, sizeof(kernel_buffer));
+    DEBUG("kernel_memory", "copy status %d\n", status);
+    if (status == 0) {
+        return -1;
+    } else if (status < 0) {
+        exit_process(128);
+    }
+    return vfs_remove(filename);
+}
+
+int exec_process(char *filename) {
+    char kernel_buffer[KERNEL_BUFFER_SIZE];
+    int status;
+
+    status = userland_to_kernel_strcpy(filename, kernel_buffer, sizeof(kernel_buffer));
+    DEBUG("kernel_memory", "copy status %d\n", status);
+    if (status == 0) {
+        return -1;
+    } else if (status < 0) {
+        exit_process(128);
+    }
+
+    return process_start(kernel_buffer);
 }
 
 int process_join(int process) {
@@ -349,20 +356,14 @@ void syscall_handle(context_t *user_context)
             result = process_join((int)user_context->cpu_regs[MIPS_REGISTER_A1]);
             break;
         case SYSCALL_OPEN:
-            lock_acquire(process_filehandle_lock);
             result = open_file((char*)(user_context->cpu_regs[MIPS_REGISTER_A1]));
-            lock_release(process_filehandle_lock);
             break;
         case SYSCALL_CLOSE:
-            lock_acquire(process_filehandle_lock);
             result = close_file((int)(user_context->cpu_regs[MIPS_REGISTER_A1]));
-            lock_release(process_filehandle_lock);
             break;
         case SYSCALL_SEEK:
-            lock_acquire(process_filehandle_lock);
             result = seek_file((int)(user_context->cpu_regs[MIPS_REGISTER_A1]),
                                (int)(user_context->cpu_regs[MIPS_REGISTER_A2]));
-            lock_release(process_filehandle_lock);
             break;
         case SYSCALL_READ:
             result = read_from_handle((int)(user_context->cpu_regs[MIPS_REGISTER_A1]),
