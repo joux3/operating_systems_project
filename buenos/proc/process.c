@@ -187,7 +187,7 @@ void process_init(uint32_t entry_point) {
     context_t user_context;
     interrupt_status_t intr_status;
     thread_table_t *my_entry;
-    char** argv;
+    uint32_t argv;
     uint32_t argc;
     uint32_t i;
 
@@ -199,15 +199,14 @@ void process_init(uint32_t entry_point) {
        thread_goto_userland) */
     memoryset(&user_context, 0, sizeof(user_context));
 
-    argv = (char**)(my_entry->context->cpu_regs[MIPS_REGISTER_A1]);
+    argv = (my_entry->context->cpu_regs[MIPS_REGISTER_A1]);
     argc = (my_entry->context->cpu_regs[MIPS_REGISTER_A2]);
 
     DEBUG("processdebug", " n arguments %d\n", argc);
     DEBUG("processdebug", " stack ptr %X\n", argv);
     for(i = 0; i < argc; i++)
     {
-        DEBUG("processdebug", " argument ptr %X\n", argv[(int)i]);
-        DEBUG("processdebug", " %u argument %s\n", i , argv[(int)i]);
+        DEBUG("processdebug", " %u argument %s\n", i , (((char**)argv)[i]));
 
     }
     /* pull out the extra arguments */
@@ -406,11 +405,9 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
     
     new_entry->context->cpu_regs[MIPS_REGISTER_A0] = elf.entry_point;
     /* copy the arguments to userland stack and set registers */
-
-    int stack_offset = (arg_datalen / sizeof(void*)) * sizeof(void*) + sizeof(void*);
-    DEBUG("processdebug", "offset is %d\n", stack_offset);
+    
     /* set new stacktop on word boundary */
-    stack_top = USERLAND_STACK_TOP - stack_offset;
+    stack_top = ((USERLAND_STACK_TOP - arg_datalen) & (~3));
 
     void* ptr_kernel = arg_data;
     void* ptr_usrland = (void*)stack_top;

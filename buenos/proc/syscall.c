@@ -223,21 +223,6 @@ int remove_file(char* filename) {
     return vfs_remove(filename);
 }
 
-int exec_process(char *filename) {
-    char kernel_buffer[KERNEL_BUFFER_SIZE];
-    int status;
-
-    status = userland_to_kernel_strcpy(filename, kernel_buffer, sizeof(kernel_buffer));
-    DEBUG("kernel_memory", "copy status %d\n", status);
-    if(status == 0){
-        return -1;
-    }
-    else if(status < 0){
-        KERNEL_PANIC("should call process exit\n");
-    }
-    return process_start(kernel_buffer);
-}
-
 int execp_process(char *filename, char argc, char **argv) {
     char kernel_buffer[KERNEL_BUFFER_SIZE];
     char arg_buffer[KERNEL_BUFFER_SIZE];
@@ -378,10 +363,6 @@ void syscall_handle(context_t *user_context)
         break;
     #ifdef CHANGED_2
         case SYSCALL_EXEC:
-            DEBUG("processdebug", "exec called\n");
-            result = exec_process((char*)(user_context->cpu_regs[MIPS_REGISTER_A1]));
-            break;
-        case SYSCALL_EXECP:
             DEBUG("processdebug", "execp called\n");
             result = execp_process((char*)(user_context->cpu_regs[MIPS_REGISTER_A1]), (char)(user_context->cpu_regs[MIPS_REGISTER_A2]), (char**)(user_context->cpu_regs[MIPS_REGISTER_A3]));
             break;
