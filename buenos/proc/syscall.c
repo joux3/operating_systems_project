@@ -227,8 +227,6 @@ int write_to_handle(int filehandle, void* buffer, int length) {
     if (n < 0)
     {
         exit_process(128);
-    } else if (n == 0) {
-        KERNEL_PANIC("Kernel output too small in write_to_handle?!");
     }
         
     if (filehandle == FILEHANDLE_STDIN) {

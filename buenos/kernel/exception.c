@@ -93,6 +93,7 @@ void kernel_exception_handle(int exception)
     if(my_entry->on_kernel_copy)
     {
         my_entry->copy_error_status = exception;
+        my_entry->context->pc += 4;
         DEBUG("kernel_memory", "exception while in kernel<->userland copying\n");
         goto exit;
     }
