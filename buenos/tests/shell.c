@@ -17,6 +17,7 @@ void run_linebuffer() {
     for (i = 0; i < linelength; i++) {
         if (linebuffer[i] == '&') {
             startbg = 1;
+            linebuffer[i] = '\0';
         } 
     }
 
