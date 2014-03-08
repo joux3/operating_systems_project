@@ -70,5 +70,6 @@ void *syscall_memlimit(void *heap_end);
 void prints(const char *str);
 int strlen(const char *str);
 void itoa(int num, char *buf);
+int stringcmp(const char *str1, const char *str2);
 
 #endif /* BUENOS_USERLAND_LIB_H */

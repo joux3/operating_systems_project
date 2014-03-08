@@ -227,3 +227,34 @@ void itoa(int num, char *buf) {
 
     *buf = '\0';
 }
+
+/**
+ * Compares two strings. The strings must be null-terminated. If the
+ * strings are equal returns 0. If the first string is greater than
+ * the second one, returns a positive value. If the first string is
+ * less than the second one, returns a negative value. This function
+ * works like the strncpy function in the C library.
+ *
+ * @param str1 First string to compare.
+ *
+ * @param str2 The second string to compare.
+ *
+ * @return The difference of the first pair of bytes in str1 and str2
+ * that differ. If the strings are equal returns 0.
+ */
+int stringcmp(const char *str1, const char *str2)
+{
+    while(1) {
+        if (*str1 == '\0' && *str2 == '\0')
+            return 0;
+        if (*str1 == '\0' || *str2 == '\0' ||
+            *str1 != *str2)
+            return *str1-*str2;
+
+        str1++;
+        str2++;
+    }
+
+    /* Dummy return to keep gcc happy */
+    return 0; 
+}
