@@ -46,6 +46,9 @@
 #define SYSCALL_JOIN 0x103
 #define SYSCALL_FORK 0x104
 #define SYSCALL_MEMLIMIT 0x105
+#ifdef CHANGED_2
+#define SYSCALL_EXECP 0x106
+#endif 
 #define SYSCALL_OPEN 0x201
 #define SYSCALL_CLOSE 0x202
 #define SYSCALL_SEEK 0x203
@@ -54,9 +57,6 @@
 #define SYSCALL_CREATE 0x206
 #define SYSCALL_DELETE 0x207
 
-#ifdef CHANGED_2
-#define SYSCALL_EXECP 0x106
-#endif 
 
 /* When userland program reads or writes these already open files it
  * actually accesses the console.

@@ -47,7 +47,8 @@
     #include "vm/vm.h"
     #include "vm/pagepool.h"
 
-    #define KERNEL_BUFFER_SIZE 512
+    
+    #define KERNEL_BUFFER_SIZE 256
 
 gcd_t *syscall_get_console_gcd(void) {
     // get first device (index 0) of type console
@@ -240,11 +241,11 @@ int exec_process(char *filename) {
 int execp_process(char *filename, char argc, char **argv) {
     char kernel_buffer[KERNEL_BUFFER_SIZE];
     char arg_buffer[KERNEL_BUFFER_SIZE];
-    int n_copied;
-    int n, i;
+    int n_copied, i, n;
+    DEBUG("processdebug", "%d arguments in execp\n", argc);
 
     n = userland_to_kernel_strcpy(filename, kernel_buffer, sizeof(kernel_buffer));
-    DEBUG("process_debug", "copy status %d\n", n);
+    DEBUG("processdebug", "copy status %d\n", n);
     if(n == 0){
         return -1;
     }
@@ -255,8 +256,12 @@ int execp_process(char *filename, char argc, char **argv) {
     n_copied = 0;
     for(i = 0; i < argc; i++)
     {
-        n = userland_to_kernel_strcpy(argv[i], arg_buffer + n_copied, sizeof(arg_buffer) - n_copied);
-        DEBUG("process_debug", "copy status %d\n", n);
+	/*copy string to kernel buffer and leave argc amount of room to store the offsets  */
+        DEBUG("processdebug", "trying to copy %d argument %s\n", i, argv[i]);
+        n = userland_to_kernel_strcpy(argv[i], arg_buffer + argc * sizeof(void*) + n_copied, sizeof(arg_buffer) - n_copied);
+	    *(int*)(arg_buffer + i * sizeof(void*)) = n_copied;
+        DEBUG("processdebug", "copy status %d\n", n);
+        DEBUG("processdebug", "%d offset is %d\n",i,  n_copied) ;
         if(n == 0){
             return -1;
         }
@@ -265,9 +270,10 @@ int execp_process(char *filename, char argc, char **argv) {
         }
         /* count in the ending characters */
         n_copied += n + 1;
+        
     }
 
-    return process_start_args(kernel_buffer, arg_buffer, n_copied, argc);
+    return process_start_args(kernel_buffer, arg_buffer, n_copied + argc * sizeof(int*), argc);
 }
 
 void exit_process(int retval) {
@@ -372,9 +378,11 @@ void syscall_handle(context_t *user_context)
         break;
     #ifdef CHANGED_2
         case SYSCALL_EXEC:
+            DEBUG("processdebug", "exec called\n");
             result = exec_process((char*)(user_context->cpu_regs[MIPS_REGISTER_A1]));
             break;
         case SYSCALL_EXECP:
+            DEBUG("processdebug", "execp called\n");
             result = execp_process((char*)(user_context->cpu_regs[MIPS_REGISTER_A1]), (char)(user_context->cpu_regs[MIPS_REGISTER_A2]), (char**)(user_context->cpu_regs[MIPS_REGISTER_A3]));
             break;
         case SYSCALL_EXIT:

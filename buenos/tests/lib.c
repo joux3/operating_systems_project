@@ -64,9 +64,10 @@ int syscall_exec(const char *filename)
  * it. Returns the process ID of the created process. Negative values
  * are errors.
  */
+
 int syscall_execp(const char *filename, int argc, const char **argv)
 {
-    return (int)_syscall(SYSCALL_EXEC, (uint32_t)filename, 
+    return (int)_syscall(SYSCALL_EXECP, (uint32_t)filename, 
                          (uint32_t) argc, 
                          (uint32_t) argv);
 }

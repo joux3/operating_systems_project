@@ -187,6 +187,9 @@ void process_init(uint32_t entry_point) {
     context_t user_context;
     interrupt_status_t intr_status;
     thread_table_t *my_entry;
+    char** argv;
+    uint32_t argc;
+    uint32_t i;
 
     DEBUG("processdebug", "in process_init, entrypoint %d\n", entry_point);
 
@@ -196,17 +199,25 @@ void process_init(uint32_t entry_point) {
        thread_goto_userland) */
     memoryset(&user_context, 0, sizeof(user_context));
 
-    DEBUG("processdebug", "setting new regs\n");
-    /* pull out the extra arguments */
-    user_context.cpu_regs[MIPS_REGISTER_SP] = my_entry->context->cpu_regs[MIPS_REGISTER_A1];
-    user_context.cpu_regs[MIPS_REGISTER_A1] = my_entry->context->cpu_regs[MIPS_REGISTER_A1];
-    user_context.cpu_regs[MIPS_REGISTER_A0] = my_entry->context->cpu_regs[MIPS_REGISTER_A2];
-    DEBUG("processdebug", "argument string first entry %X\n", my_entry->context->cpu_regs[MIPS_REGISTER_A1]);
+    argv = (char**)(my_entry->context->cpu_regs[MIPS_REGISTER_A1]);
+    argc = (my_entry->context->cpu_regs[MIPS_REGISTER_A2]);
 
-    /*
+    DEBUG("processdebug", " n arguments %d\n", argc);
+    DEBUG("processdebug", " stack ptr %X\n", argv);
+    for(i = 0; i < argc; i++)
+    {
+        DEBUG("processdebug", " argument ptr %X\n", argv[(int)i]);
+        DEBUG("processdebug", " %u argument %s\n", i , argv[(int)i]);
+
+    }
+    /* pull out the extra arguments */
+    user_context.cpu_regs[MIPS_REGISTER_SP] = (uint32_t)argv;
+    user_context.cpu_regs[MIPS_REGISTER_A0] = (uint32_t)argc;
+    user_context.cpu_regs[MIPS_REGISTER_A1] = (uint32_t)argv;
+
+    DEBUG("processdebug", "set arguments\n", argv);
     my_entry->context->cpu_regs[MIPS_REGISTER_A1] = 0;
     my_entry->context->cpu_regs[MIPS_REGISTER_A2] = 0;
-    */
 
     user_context.pc = entry_point;
 
@@ -234,7 +245,7 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
     pagetable_t *pagetable;
     pagetable_t *original_pagetable;
     uint32_t phys_page;
-    uint32_t stack_bottom;
+    uint32_t stack_bottom, stack_top;
     elf_info_t elf;
     openfile_t file;
     int invalid;
@@ -395,18 +406,44 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
     
     new_entry->context->cpu_regs[MIPS_REGISTER_A0] = elf.entry_point;
     /* copy the arguments to userland stack and set registers */
-    n = kernel_to_userland_memcpy(arg_data, (void*)(USERLAND_STACK_TOP - arg_datalen), arg_datalen);
-    DEBUG("kernel_memory", "copy status %d\n", n);
-    if(n < 0){
-            KERNEL_PANIC("copying arguments to userland stack failed\n");
+
+    int stack_offset = (arg_datalen / sizeof(void*)) * sizeof(void*) + sizeof(void*);
+    DEBUG("processdebug", "offset is %d\n", stack_offset);
+    /* set new stacktop on word boundary */
+    stack_top = USERLAND_STACK_TOP - stack_offset;
+
+    void* ptr_kernel = arg_data;
+    void* ptr_usrland = (void*)stack_top;
+    
+    DEBUG("processdebug", "stack top is now %X\n", stack_top);
+    DEBUG("processdebug", "datalen is %d\n", arg_datalen);
+    /* insert the pointers before the argument strings */
+    for(i = 0; i < arg_count; i++) {
+        int offset = *(int*)ptr_kernel; 
+        DEBUG("processdebug", "%d offset %d\n", i, offset);
+        char* tmp_kernel_ptr = offset + (char*)stack_top + arg_count*sizeof(void*);
+        DEBUG("processdebug", "%d pointer points %X\n", i, tmp_kernel_ptr);
+        n = kernel_to_userland_memcpy(&tmp_kernel_ptr, ptr_usrland, sizeof(char*));
+        /* has to be able to get the data so 0 copied is unacceptable */
+        KERNEL_ASSERT(n > 0);
+        ptr_usrland += sizeof(char*);
+        ptr_kernel += sizeof(char*);
     }
+    DEBUG("processdebug", "copied %d pointers\n", arg_count);
+    DEBUG("processdebug", "usrland at %X kernel at %X\n", ptr_usrland, ptr_kernel);
+
+    /* copy the strings after the pointers */
+    n = kernel_to_userland_memcpy(ptr_kernel, ptr_usrland, arg_datalen - arg_count * sizeof(char*));
+    DEBUG("processdebug", "copy status %d\n", n);
+    /* exception in copying unacceptable 0 copied is accepted since 0 arguments is accepted */
+    KERNEL_ASSERT(n >= 0);
     DEBUG("processdebug", "added arguments on top of the stack\n");
     // force in some extra arguments 
     // TODO find out a better way than this to pass these
     // stack ptr 
-    new_entry->context->cpu_regs[MIPS_REGISTER_A1] = USERLAND_STACK_TOP - arg_datalen;
+    new_entry->context->cpu_regs[MIPS_REGISTER_A1] = stack_top;
     //arg count
-    new_entry->context->cpu_regs[MIPS_REGISTER_A2] = USERLAND_STACK_TOP - arg_count;
+    new_entry->context->cpu_regs[MIPS_REGISTER_A2] = arg_count;
     DEBUG("processdebug", "run new thread\n");
     thread_run(thread_id);
     

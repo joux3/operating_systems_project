@@ -45,13 +45,15 @@ TARGETS  := $(patsubst %.o, %, $(OBJECTS))
 # the pre-requisites list (or object files list).
 SYSLIBS := crt.o _syscall.o lib.o
 
+CHANGEDFLAGS := -DCHANGED_1 -DCHANGED_2 -DCHANGED_3 -DCHANGED_4 -DCHANGED_5
+
 # Compiler configuration
 CC      := mips-elf-gcc
 AS      := mips-elf-as
 LD      := mips-elf-ld
-CFLAGS  += -G0 -I.. -Wall -W -Werror
+CFLAGS  += -G0 -I.. -Wall -W -Werror $(CHANGEDFLAGS)
 LDFLAGS := --script=ld.userland.script --cref -s -G0
-ASFLAGS := -I.. -Wa,-mips32
+ASFLAGS := -I.. -Wa,-mips32 $(CHANGEDFLAGS)
 
 # -G0 is needed to avoid GP optimization (LD won't link if it is used)
 
