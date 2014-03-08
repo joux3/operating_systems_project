@@ -191,12 +191,8 @@ int kernel_to_userland_memcpy(void* src, void* dst, uint32_t lenmem)
 #ifdef CHANGED_2
 void process_init(uint32_t entry_point) {
     context_t user_context;
-    interrupt_status_t intr_status;
-    thread_table_t *my_entry;
 
     DEBUG("processdebug", "in process_init, entrypoint %d\n", entry_point);
-
-    my_entry = thread_get_current_thread_entry();
 
     /* Initialize the user context. (Status register is handled by
        thread_goto_userland) */
@@ -205,10 +201,6 @@ void process_init(uint32_t entry_point) {
     user_context.pc = entry_point;
 
     thread_goto_userland(&user_context);
-
-    intr_status = _interrupt_disable();
-    tlb_fill(my_entry->pagetable);
-    _interrupt_set_state(intr_status);
 
     KERNEL_PANIC("Thread returned from userland...");
 }
