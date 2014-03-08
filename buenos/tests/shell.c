@@ -6,6 +6,7 @@ int main(void) {
     char retval_buf[64];
     int startbg;
     read = 0;
+    prints("> ");
     while(1) {
         startbg = 0;
         if (read == 512) {
@@ -26,12 +27,12 @@ int main(void) {
         }
         read = (read < 0) ? 0 : read;
         
-        prints("\r");
+        prints("\r> ");
         syscall_write(stdout, buffer, read);
         for (i = 0; i < deletedchars; i++) {
             prints(" ");
         }
-        prints("\r");
+        prints("\r> ");
         syscall_write(stdout, buffer, read);
         for (i = 0; i < read; i++) {
             if (buffer[i] == '&') {
@@ -52,14 +53,14 @@ int main(void) {
                     prints("failed to start process: "); 
                     itoa(pid, retval_buf);
                     prints(retval_buf);
-                    prints("\n");
+                    prints("\n> ");
                 } else {
                     if (!startbg) {
                         int retval = syscall_join(pid);
                         prints("return value: "); 
                         itoa(retval, retval_buf);
                         prints(retval_buf);
-                        prints("\n");
+                        prints("\n> ");
                     }
                 }
                 break;
