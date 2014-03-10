@@ -71,11 +71,67 @@ Assignment 2
 4. Changes to the plan presented in the review session
     - none
 
+--------------
+
 Assignment 3
 
+Of note: this assignemnt is the big one on this round, so the following wall of text will be the
+longest yet.
+
 1. Changed files
+    - the system calls are implemented in proc/syscall.c
+    - process.c/h are also modified in order to accomodate the safe copying
+      of parameters between userland and kernel and and passing parameters to processes
+      (in practice, the process_start() has been split to process_start() ans process_init()
+      and modified such that it accpets parameters)
 
 2. Description of the solution
+    - let's go through the syscalls one by one
+    
+    - since we implemented the argument augmented processes, the processes are started with
+      the execp function
+    - syscall_execp(filename, argcount, aruments):
+        - copy the filename to kernel (using the safe copy mechanism)
+        - if the copying failed (nothing was copied, a bad pointer was given or too many
+          arguments were supplied), return error (and in case of the bad pointer, exit the
+          process)
+        - copy the argument pointer to the kernel (there is always at least one argument, which is
+          the name of the executable file)
+        - if invalid pointers are supplied, exit the process
+        - then copy the arguments kernel, as pointed out by the argument pointer and the amount
+          of arguments (and some sweet pointer arithmetic!)
+        - again, in case of illegal pointers, exit the process and in case of failed copies return
+          a note of that
+        - after everything is safely copied to the kernel, call process start with the arguments
+
+    - syscall_join(int process_id):
+        - validate the process id
+        - if invalid, return error code
+        - lock the process table
+        - check that there is a process in the process table with the given id and that that process
+          is this process' child
+        - if not, return error code
+        - wait for the condition variable that tells that a process has become a zombie
+            - if the process we are joining with is no longer running, free up the process table entry
+              and get the return value from the child
+            - otherwise wait more
+        - rekease the process table lock and return the result
+
+    - syscall_exit(int return_value):
+        - get the current process
+        - lock the filehandle table
+        - close the filehandles associated with this process and free the filehandle table entries
+        - release the filehandle lock
+        - lock the process table
+        - set the return value of the process
+        - set the process state to zombie
+        - go clean out the zombie children from the process table
+        - release the process table lock
+        - broadcast the zombie condtition variable (so that the processes joining to this process can
+          exit)
+        - clean up the pagetable and free the physical pages associated to the process
+        - call thread finish
+        
 
 3. Motivation behind the solution
 
