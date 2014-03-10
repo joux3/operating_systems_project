@@ -292,13 +292,27 @@ int execp_process(char *filename, char argc, char **argv) {
     } else if (n < 0) {
         exit_process(128);
     }
+
+    if (argc >= (int)(KERNEL_BUFFER_SIZE / sizeof(void*))) {
+        return -1;
+    }
+    
+    // first copy argv over
+    n = userland_to_kernel_memcpy(argv, arg_buffer, argc * sizeof(void*));
+    if (n == 0) {
+        KERNEL_PANIC("should not happen as argc is already validated to be small enough\n");
+    } else if (n < 0) {
+        DEBUG("processdebug", "Illegal argv pointer\n", n);
+        exit_process(128);
+    }
     
     n_copied = 0;
+    // then copy strings in argv, calculate cumulative offsets 
     for(i = 0; i < argc; i++)
     {
 	/*copy string to kernel buffer and leave argc amount of room to store the offsets  */
-        DEBUG("processdebug", "trying to copy %d argument %s\n", i, argv[i]);
-        n = userland_to_kernel_strcpy(argv[i], arg_buffer + argc * sizeof(void*) + n_copied, sizeof(arg_buffer) - n_copied);
+        DEBUG("processdebug", "trying to copy %d argument %s\n", i, ((char **)arg_buffer)[i]);
+        n = userland_to_kernel_strcpy(((char **)arg_buffer)[i], arg_buffer + argc * sizeof(void*) + n_copied, sizeof(arg_buffer) - n_copied);
 	    *(int*)(arg_buffer + i * sizeof(void*)) = n_copied;
         DEBUG("processdebug", "copy status %d\n", n);
         DEBUG("processdebug", "%d offset is %d\n",i,  n_copied) ;
@@ -306,7 +320,8 @@ int execp_process(char *filename, char argc, char **argv) {
             return -1;
         }
         else if(n < 0){
-            KERNEL_PANIC("should call process exit\n");
+            DEBUG("processdebug", "Illegal argv string pointer\n", n);
+            exit_process(128);
         }
         /* count in the ending characters */
         n_copied += n + 1;
