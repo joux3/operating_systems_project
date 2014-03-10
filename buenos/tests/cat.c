@@ -4,9 +4,15 @@ int filehandle;
 int read;
 char buffer[512];
 
-int main(void) {
+int main(int argc, char **argv) {
     int result = 0;
-    filehandle = syscall_open("[testi]labbalabba");
+
+    if (argc < 2) {
+        prints("Usage: cat <filename>\n");
+        return 1;
+    }
+
+    filehandle = syscall_open(argv[1]);
     if (filehandle > 0) {
         while((read = syscall_read(filehandle, buffer, 512)) > 0) {
             syscall_write(stdout, buffer, 512);
