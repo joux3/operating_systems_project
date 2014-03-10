@@ -212,8 +212,11 @@ void process_init(uint32_t entry_point) {
         DEBUG("processdebug", " %u, 0x%x argument %s\n", i, (((char**)argv)[i]), (((char**)argv)[i]));
 
     }
+
     /* pull out the extra arguments */
-    user_context.cpu_regs[MIPS_REGISTER_SP] = (uint32_t)(argv - 2*sizeof(void*));
+    
+    // reserve stack space for argument registers A0, A1
+    user_context.cpu_regs[MIPS_REGISTER_SP] = (uint32_t)(argv - 2*sizeof(void*)); 
     user_context.cpu_regs[MIPS_REGISTER_A0] = (uint32_t)argc;
     user_context.cpu_regs[MIPS_REGISTER_A1] = (uint32_t)argv;
 
@@ -229,7 +232,6 @@ void process_init(uint32_t entry_point) {
 int process_start(const char *executable)
 {
     return process_start_args(executable, NULL, 0,0);
-
 }
 
 int process_start_args(const char *executable, void *arg_data, int arg_datalen, int arg_count )
@@ -248,15 +250,6 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
 
     int i, n;
  
-    /*
-
-        jos rw/ro_addr ei oo page boundaryllä, varataanko tarpeeksi muistia?
-
-        jos rw/ro muistialueet menee samalle pagelle, mutta ei alueina paallekkain
-          -> ei saa koittaa mapata samaa virtuaalimuistipagea       
-
-*/
-    
     interrupt_status_t intr_status;
 
     process_id = -1;
@@ -297,6 +290,7 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
 
     intr_status = _interrupt_disable();
     new_entry->pagetable = pagetable;
+    // set my pagetable too to support context switches during process start
     my_entry->pagetable = pagetable;
     _interrupt_set_state(intr_status);
 
@@ -430,6 +424,7 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
     // manually overwrite the arg to point to entry point
     
     new_entry->context->cpu_regs[MIPS_REGISTER_A0] = elf.entry_point;
+
     /* copy the arguments to userland stack and set registers */
     
     /* set new stacktop on under arguments */
@@ -458,11 +453,10 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
     /* copy the strings after the pointers */
     n = kernel_to_userland_memcpy(ptr_kernel, ptr_usrland, arg_datalen - arg_count * sizeof(char*));
     DEBUG("processdebug", "copy status %d\n", n);
-    /* exception in copying unacceptable 0 copied is accepted since 0 arguments is accepted */
+    /* exception in copying unacceptable. 0 copied is accepted since no arguments is accepted */
     KERNEL_ASSERT(n >= 0);
     DEBUG("processdebug", "added arguments on top of the stack\n");
     // force in some extra arguments 
-    // TODO find out a better way than this to pass these
     // stack ptr 
     new_entry->context->cpu_regs[MIPS_REGISTER_A1] = stack_top;
     //arg count
