@@ -39,15 +39,37 @@ Assignment 1
 4. Changes to the plan presented in the review session
     - None
 
+----------
+
 Assignment 2
 
 1. Changed files
+    - process.c/h contains the tables and data structures for this assignment
 
 2. Description of the solution
+    - in this assignment we have implemented two data structures for the processes - 
+      one table for process entries and one table for filehandles
+    - both tables are protected with a lock in order to satisfy the synchronization
+      requirement ofthe assignment
+    - the size of the filehandle table is capped by the maximum number of open files
+    - the size of the process table is capped at 64
+    - the process entry stores:
+        - the name of the process (executable name + where it's found on the file system)
+        - process state (free, running, zombie), where free signifies that the entry is free
+        - the process id of the parent
+        - return value of the process
+    - the filehandle entry contains:
+        - flag telling if the entry is in use
+        - the owner of the entry
+        - the openfile_t identifier of of the file in the filesystem
+    - there's also a condition variable that is used to put the processes that are waiting for
+      their children to sleep, but more on that in syscall_join
 
 3. Motivation behind the solution
+    - tables with locks are the simplest synchronized data structures
 
 4. Changes to the plan presented in the review session
+    - none
 
 Assignment 3
 
