@@ -156,14 +156,43 @@ longest yet.
         - release the lock
         - return the result (negative on error)
 
-    - syscall_seek():
+    - syscall_seek(filehandle, position):
         - seek is exactly the same as close, but instead of close we call the seek
           function of the filesystem
+
+    - syscall_read(filehandle, buffer, length):
+        - cap the length to kernel buffer size (we have capped it to 256)
+        - safely copy the filename to kernel (and handle errors)
+        - if we are trying to read from stdout or stderr, return error
+        - if we are reading from stdin, use the tty_read
+        - if we are reading from a file:
+            - lock the filehandle table
+            - get the appropriate entry from filehandle table
+            - if the entry is valid (in use and owned by this process) read from the
+              given file to a buffer
+            - otherwise return error
+            - release the filehandle table lock
+        -copy the buffer read from file to kernel using the sae copy methods (report errirs etc)
+        -return the result (or error, if that occured)
+
+    - syscall_write(filehandle, buffer, length)
+        - writing is exacly like reading, but instead of copying the buffer to kernel in the end
+          (since we are not reading anything), we copy the buffer we want to write to kernel
+          in the beginning
+        - of course we have to check the streams differently (you can't write to stdin, but you
+          can in stdout and stderr)
+
+    - syscall_create(filename, size), syscall_delete(filename)
+        - these functions are mainly wrappers for the filesystem's functions, augmented with safe
+          copying of the appropriate elements to kernel
         
 
 3. Motivation behind the solution
+    - There were not particularly hard dwsign decision regarding the syscall implementations,
+      so they were implemented as leanly as possible
 
 4. Changes to the plan presented in the review session
+    - none
 
 Assignment 4
 
