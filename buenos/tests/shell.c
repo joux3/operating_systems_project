@@ -27,17 +27,17 @@ void run_linebuffer() {
     for (i = 1; i < linelength; i++) {
         if (linebuffer[i] == ' ') {
             linebuffer[i] = '\0';
-        } else if (linebuffer[i - 1] == '\0' && argc < 64) {
+        } else if (linebuffer[i - 1] == '\0' && linebuffer[i] != '\0' && argc < 64) {
             argv[argc++] = &linebuffer[i];
         }
     }
 
     linelength = 0;
-    /*
-    prints("argv:\n");
+    
+    /*prints("argv:\n");
     for (i = 0; i < argc; i++) {
         prints(argv[i]);
-        prints("\n");
+        prints("a\n");
     }*/
 
     int pid = syscall_execp(linebuffer, argc, (const char**)argv);
