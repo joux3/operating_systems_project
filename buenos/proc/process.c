@@ -427,7 +427,7 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
 
     /* copy the arguments to userland stack and set registers */
     
-    /* set new stacktop on under arguments */
+    /* set new stacktop on under arguments, align on word boundary */
     stack_top = ((USERLAND_STACK_TOP - arg_datalen) & (~3));
 
     void* ptr_kernel = arg_data;
@@ -436,6 +436,7 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
     DEBUG("processdebug", "stack top is now %X\n", stack_top);
     DEBUG("processdebug", "datalen is %d\n", arg_datalen);
     /* insert the pointers before the argument strings */
+    /* modify the offsets to actual userland pointers */
     for(i = 0; i < arg_count; i++) {
         int offset = *(int*)ptr_kernel; 
         DEBUG("processdebug", "%d offset %d\n", i, offset);
@@ -459,7 +460,7 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
     // force in some extra arguments 
     // stack ptr 
     new_entry->context->cpu_regs[MIPS_REGISTER_A1] = stack_top;
-    //arg count
+    // arg count
     new_entry->context->cpu_regs[MIPS_REGISTER_A2] = arg_count;
     DEBUG("processdebug", "run new thread\n");
 
