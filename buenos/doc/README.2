@@ -10,5 +10,31 @@ Members
 
 Assignment 1
 1. Changed files
+    - excepption.c (excepction handling to userland processes in order to prevent
+      constant kernel panics)
+    - thread.c/h (added the flags that signify that copying between kernel and
+      userland is in process)
+    - process.c/h (functions to do the actual copying between kernel and userland)
 
-    - 
+
+2. Description of the solution
+    - the solution works as follows (for copying both certain length strings and blocks
+      of predefined size)
+        - get the current thread entry
+        - decide which way we are copying (kernel -> userland or userland -> kernel)
+        - assert that we are currently not copying
+        - put up the flag that tells that copying in process
+        - then, for each byte to be copied, check that the userland pointer is in a
+          userland legal region (userland mapped memory)
+            - if it is, copy the byte and process the next byte
+            - if it's not, put down the copying flag and return an error
+            - if an error has occured at some point, also put down the copy flag
+              and return error
+        - finally, if all went well, return the amount of bytes copied
+
+3. Motivation behind the solution
+    - the solution aims for simplicity and throroughness, and checking every byte seems
+      like the way to do it
+
+4. Changes to the plan presented in the review session
+    - None
