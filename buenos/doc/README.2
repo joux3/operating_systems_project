@@ -9,13 +9,12 @@ Members
 --------
 
 Assignment 1
-1. Changed files
-    - excepption.c (excepction handling to userland processes in order to prevent
-      constant kernel panics)
-    - thread.c/h (added the flags that signify that copying between kernel and
-      userland is in process)
-    - process.c/h (functions to do the actual copying between kernel and userland)
 
+1. Changed files
+    - kernel/exception.c (removed kernel panicing when doing userland<->kernel copying)
+    - kernel/thread.c/h (added the flags that signify that copying between kernel and
+      userland is in process)
+    - proc/process.c/h (functions to do the actual copying between kernel and userland)
 
 2. Description of the solution
     - the solution works as follows (for copying both certain length strings and blocks
@@ -28,9 +27,11 @@ Assignment 1
           userland legal region (userland mapped memory)
             - if it is, copy the byte and process the next byte
             - if it's not, put down the copying flag and return an error
-            - if an error has occured at some point, also put down the copy flag
+            - if an exception has occured during the copying, also put down the copy flag
               and return error
         - finally, if all went well, return the amount of bytes copied
+    - in the case of copying strings, also make sure that we're not overflowing the kernel
+      side buffer
 
 3. Motivation behind the solution
     - the solution aims for simplicity and throroughness, and checking every byte seems
@@ -44,13 +45,13 @@ Assignment 1
 Assignment 2
 
 1. Changed files
-    - process.c/h contains the tables and data structures for this assignment
+    - proc/process.c/h contains the tables and data structures for this assignment
 
 2. Description of the solution
     - in this assignment we have implemented two data structures for the processes - 
       one table for process entries and one table for filehandles
     - both tables are protected with a lock in order to satisfy the synchronization
-      requirement ofthe assignment
+      requirement of the assignment
     - the size of the filehandle table is capped by the maximum number of open files
     - the size of the process table is capped at 64
     - the process entry stores:
@@ -80,10 +81,10 @@ longest yet.
 
 1. Changed files
     - the system calls are implemented in proc/syscall.c
-    - process.c/h are also modified in order to accomodate the safe copying
+    - proc/process.c/h are also modified in order to accomodate the safe copying
       of parameters between userland and kernel and and passing parameters to processes
       (in practice, the process_start() has been split to process_start() ans process_init()
-      and modified such that it accpets parameters)
+      and modified such that it accepts parameters)
 
 2. Description of the solution
     - let's go through the syscalls one by one
@@ -115,7 +116,7 @@ longest yet.
             - if the process we are joining with is no longer running, free up the process table entry
               and get the return value from the child
             - otherwise wait more
-        - rekease the process table lock and return the result
+        - release the process table lock and return the result
 
     - syscall_exit(int return_value):
         - get the current process
@@ -127,7 +128,7 @@ longest yet.
         - set the process state to zombie
         - go clean out the zombie children from the process table
         - release the process table lock
-        - broadcast the zombie condtition variable (so that the processes joining to this process can
+        - broadcast the zombie condition variable (so that the processes joining to this process can
           exit)
         - clean up the pagetable and free the physical pages associated to the process
         - call thread finish
