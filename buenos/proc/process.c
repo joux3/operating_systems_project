@@ -76,11 +76,14 @@ void process_init_process_table(void) {
         process_filehandle_table[i].in_use = 0;
     }
 }
-#endif
 
-
-#ifdef CHANGED_2
-/* returns positive if succes 0 if failure negative if exception  direction > 0 if userland to kernel*/
+/* 
+    param direction > 0 if userland to kernel
+    returns
+        positive if successful
+        0 if len was reached (ie. kernel buffer was too small)
+        negative if an exception occured during copy (most likely invalid userland pointer)
+*/
 int kernel_strcpy(char* src, char* dst, uint32_t len, uint32_t direction)
 {
     thread_table_t *my_entry;
@@ -122,7 +125,12 @@ int kernel_strcpy(char* src, char* dst, uint32_t len, uint32_t direction)
     return 0;
 }
 
-/* returns positive if succes 0 if failure negative if exception */
+/* 
+    param direction > 0 if userland to kernel
+    returns
+        copied length if successful
+        negative if an exception occured during copy (most likely invalid userland pointer)
+*/
 int kernel_memcpy(void* src, void* dst, uint32_t lenmem, uint32_t direction)
 {
 

@@ -59,7 +59,7 @@ gcd_t *syscall_get_console_gcd(void) {
  * Syscall handler functions
  */
 
-void exit_process(int retval) {
+void syscall_exit_process(int retval) {
     int i;
     process_id_t current_process;
     pagetable_t *pagetable;
@@ -124,7 +124,7 @@ int open_file(char* filename) {
     if (status == 0) {
         return -1;
     } else if (status < 0){
-        exit_process(128);
+        syscall_exit_process(128);
     }
 
     lock_acquire(process_filehandle_lock);
@@ -196,7 +196,7 @@ int read_from_handle(int filehandle, void* buffer, int length) {
     n = userland_to_kernel_memcpy(buffer, kernel_buffer, length < KERNEL_BUFFER_SIZE ? length : KERNEL_BUFFER_SIZE);
     if (n < 0)
     {
-        exit_process(128);
+        syscall_exit_process(128);
     }
 
     if (filehandle == FILEHANDLE_STDOUT || filehandle == FILEHANDLE_STDERR) {
@@ -227,7 +227,7 @@ int write_to_handle(int filehandle, void* buffer, int length) {
     n = userland_to_kernel_memcpy(buffer, kernel_buffer, length < KERNEL_BUFFER_SIZE ? length : KERNEL_BUFFER_SIZE);
     if (n < 0)
     {
-        exit_process(128);
+        syscall_exit_process(128);
     }
         
     if (filehandle == FILEHANDLE_STDIN) {
@@ -259,7 +259,7 @@ int create_file(char* filename, int size) {
     if (status == 0) {
         return -1;
     } else if (status < 0) {
-        exit_process(128);
+        syscall_exit_process(128);
     }
     return vfs_create(kernel_buffer, size);
 }
@@ -274,7 +274,7 @@ int remove_file(char* filename) {
     if (status == 0) {
         return -1;
     } else if (status < 0) {
-        exit_process(128);
+        syscall_exit_process(128);
     }
     return vfs_remove(filename);
 }
@@ -290,7 +290,7 @@ int execp_process(char *filename, char argc, char **argv) {
     if (n == 0){
         return -1;
     } else if (n < 0) {
-        exit_process(128);
+        syscall_exit_process(128);
     }
 
     if (argc >= (int)(KERNEL_BUFFER_SIZE / sizeof(void*))) {
@@ -303,7 +303,7 @@ int execp_process(char *filename, char argc, char **argv) {
         KERNEL_PANIC("should not happen as argc is already validated to be small enough\n");
     } else if (n < 0) {
         DEBUG("processdebug", "Illegal argv pointer\n", n);
-        exit_process(128);
+        syscall_exit_process(128);
     }
     
     n_copied = 0;
@@ -320,7 +320,7 @@ int execp_process(char *filename, char argc, char **argv) {
             return -1;
         } else if (n < 0) {
             DEBUG("processdebug", "Illegal argv string pointer\n", n);
-            exit_process(128);
+            syscall_exit_process(128);
         }
         /* count in the ending characters */
         n_copied += n + 1;
@@ -386,7 +386,7 @@ void syscall_handle(context_t *user_context)
             result = execp_process((char*)(user_context->cpu_regs[MIPS_REGISTER_A1]), (char)(user_context->cpu_regs[MIPS_REGISTER_A2]), (char**)(user_context->cpu_regs[MIPS_REGISTER_A3]));
             break;
         case SYSCALL_EXIT:
-            exit_process((int)user_context->cpu_regs[MIPS_REGISTER_A1]);
+            syscall_exit_process((int)user_context->cpu_regs[MIPS_REGISTER_A1]);
             result = -1;
             break;
         case SYSCALL_JOIN:

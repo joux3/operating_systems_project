@@ -62,4 +62,8 @@
 #define FILEHANDLE_STDOUT 1
 #define FILEHANDLE_STDERR 2
 
+#ifdef CHANGED_2
+void syscall_exit_process(int retval);
+#endif
+
 #endif

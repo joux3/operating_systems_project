@@ -39,6 +39,9 @@
 #include "lib/libc.h"
 #include "kernel/thread.h"
 #include "kernel/exception.h"
+#ifdef CHANGED_2
+    #include "proc/syscall.h"
+#endif
 
 void syscall_handle(context_t *user_context);
 
@@ -65,11 +68,21 @@ void user_exception_handle(int exception)
     _interrupt_clear_EXL();
 
     /* Save usermode context to user_context for later reference in syscalls */
-    my_entry= thread_get_current_thread_entry();
+    my_entry = thread_get_current_thread_entry();
     my_entry->user_context = my_entry->context;
 
-    // TODO: call process_exit on userland exceptions
-
+    #ifdef CHANGED_2
+        if (exception == EXCEPTION_SYSCALL) {
+            _interrupt_enable();
+            syscall_handle(my_entry->user_context);
+            _interrupt_disable();
+        } else {
+            kprintf("Exception %d occured in userland process %d\n", exception, thread_get_current_process());
+            _interrupt_enable();
+            syscall_exit_process(127); 
+            KERNEL_PANIC("Should not return from syscall_exit\n");
+        }
+    #else
     switch(exception) {
     case EXCEPTION_TLBM:
         KERNEL_PANIC("TLB Modification: not handled yet");
@@ -115,6 +128,7 @@ void user_exception_handle(int exception)
     default:
         KERNEL_PANIC("Unknown exception");
     }
+    #endif
 
     /* Interrupts are disabled by setting EXL after this point. */
     _interrupt_set_EXL();
