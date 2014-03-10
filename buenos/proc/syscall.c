@@ -203,7 +203,7 @@ int read_from_handle(int filehandle, void* buffer, int length) {
     } else if ((filehandle - 3) >= 0 && (filehandle - 3) < CONFIG_MAX_OPEN_FILES) { 
         lock_acquire(process_filehandle_lock);
         process_filehandle_t *handle_entry = &process_filehandle_table[filehandle - 3];
-        if (!handle_entry->in_use || handle_entry->owner == thread_get_current_process()) {
+        if (handle_entry->in_use && handle_entry->owner == thread_get_current_process()) {
             result = vfs_read(handle_entry->vfs_handle, kernel_buffer, length);
         } else {
             result = -1;
@@ -242,7 +242,7 @@ int write_to_handle(int filehandle, void* buffer, int length) {
     } else if ((filehandle - 3) >= 0 && (filehandle - 3) < CONFIG_MAX_OPEN_FILES) {
         lock_acquire(process_filehandle_lock);
         process_filehandle_t *handle_entry = &process_filehandle_table[filehandle - 3];
-        if (!handle_entry->in_use || handle_entry->owner == thread_get_current_process()) {
+        if (handle_entry->in_use && handle_entry->owner == thread_get_current_process()) {
             result = vfs_write(handle_entry->vfs_handle, kernel_buffer, n);
         } else {
             result = -1;
