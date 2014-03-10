@@ -427,11 +427,6 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
         vm_set_dirty(new_entry->pagetable, elf.rw_vaddr + i*PAGE_SIZE, 1);
     }
 
-    // set asid for pagetable on new thread
-    pagetable->ASID = thread_id;
-    for (i = 0; i < (int)pagetable->valid_count; i++) {
-        pagetable->entries[i].ASID = thread_id;
-    }
     // manually overwrite the arg to point to entry point
     
     new_entry->context->cpu_regs[MIPS_REGISTER_A0] = elf.entry_point;
@@ -473,6 +468,12 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
     //arg count
     new_entry->context->cpu_regs[MIPS_REGISTER_A2] = arg_count;
     DEBUG("processdebug", "run new thread\n");
+
+    // set asid for pagetable on new thread
+    pagetable->ASID = thread_id;
+    for (i = 0; i < (int)pagetable->valid_count; i++) {
+        pagetable->entries[i].ASID = thread_id;
+    }
 
     stringcopy(process_table[process_id].name, executable, 32);
     process_table[process_id].state = PROCESS_RUNNING;
