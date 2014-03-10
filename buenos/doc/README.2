@@ -131,6 +131,33 @@ longest yet.
           exit)
         - clean up the pagetable and free the physical pages associated to the process
         - call thread finish
+
+    - syscall_open(filename):
+        - copy the filename to the kernel (check for errors, return error codes if necessary and all that
+          jazz)
+        - aquire the filehandle table lock
+        - find the first free entry in the filehandle table
+        - if no free entries, return error code
+        - open the file (with the filesystem's function)
+        - if opening succeeded, populate the filehandle table entry
+        - if not, return error code
+        - finally, increment the processes filehandle by 3 (handles 0-2 are for standard streams)
+        - release the filehandle table lock
+        - return the filehandle (or error code)
+
+    - syscall_close(filehandle)
+        - lock the filehandle table
+        - decrement the filehandle by 3 (again, handles 0-2 reserved)
+        - validate the filehandle
+        - check that the filehandle is in use and is owned by the current process
+        - if all good, use the filesystem's function to close the file
+        - mark the filehandle table entry free
+        - release the lock
+        - return the result (negative on error)
+
+    - syscall_seek():
+        - seek is exactly the same as close, but instead of close we call the seek
+          function of the filesystem
         
 
 3. Motivation behind the solution
