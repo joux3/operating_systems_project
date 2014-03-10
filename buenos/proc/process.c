@@ -179,9 +179,6 @@ int kernel_to_userland_memcpy(void* src, void* dst, uint32_t lenmem)
     return kernel_memcpy(src, dst, lenmem, 0);
 }
 
-#endif
-
-#ifdef CHANGED_2
 void process_init(uint32_t entry_point) {
     context_t user_context;
     thread_table_t *my_entry;
