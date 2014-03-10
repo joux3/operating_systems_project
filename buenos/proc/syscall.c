@@ -296,6 +296,9 @@ int execp_process(char *filename, char argc, char **argv) {
     if (argc >= (int)(KERNEL_BUFFER_SIZE / sizeof(void*))) {
         return -1;
     }
+
+    // the same memory area is first used to hold pointers, then int offsets
+    KERNEL_ASSERT(sizeof(void*) == sizeof(int));
     
     // first copy argv over
     n = userland_to_kernel_memcpy(argv, arg_buffer, argc * sizeof(void*));
