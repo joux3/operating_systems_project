@@ -64,6 +64,8 @@
 
 #ifdef CHANGED_2
 void syscall_exit_process(int retval);
+
+#define SYSCALL_INVALID_USERLAND_POINTER 128
 #endif
 
 #endif

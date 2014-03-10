@@ -123,8 +123,8 @@ int open_file(char* filename) {
     status = userland_to_kernel_strcpy(filename, kernel_buffer, sizeof(kernel_buffer));
     if (status == 0) {
         return -1;
-    } else if (status < 0){
-        syscall_exit_process(128);
+    } else if (status < 0) {
+        syscall_exit_process(SYSCALL_INVALID_USERLAND_POINTER);
     }
 
     lock_acquire(process_filehandle_lock);
@@ -193,28 +193,32 @@ int read_from_handle(int filehandle, void* buffer, int length) {
     uint8_t kernel_buffer[KERNEL_BUFFER_SIZE];
     gcd_t *console;
 
-    n = userland_to_kernel_memcpy(buffer, kernel_buffer, length < KERNEL_BUFFER_SIZE ? length : KERNEL_BUFFER_SIZE);
-    if (n < 0)
-    {
-        syscall_exit_process(128);
-    }
+    length = length < KERNEL_BUFFER_SIZE ? length : KERNEL_BUFFER_SIZE;
 
     if (filehandle == FILEHANDLE_STDOUT || filehandle == FILEHANDLE_STDERR) {
         result = -1;
     } else if (filehandle == FILEHANDLE_STDIN) {
         console = syscall_get_console_gcd();
-        result = console->read(console, buffer, length);
+        result = console->read(console, kernel_buffer, length);
     } else if ((filehandle - 3) >= 0 && (filehandle - 3) < CONFIG_MAX_OPEN_FILES) { 
         lock_acquire(process_filehandle_lock);
         process_filehandle_t *handle_entry = &process_filehandle_table[filehandle - 3];
         if (!handle_entry->in_use || handle_entry->owner == thread_get_current_process()) {
-            result = vfs_read(handle_entry->vfs_handle, buffer, length);
+            result = vfs_read(handle_entry->vfs_handle, kernel_buffer, length);
         } else {
             result = -1;
         }
         lock_release(process_filehandle_lock);
     } else {
-      result = -1;
+        result = -1;
+    }
+
+    if (result > 0) {
+        n = kernel_to_userland_memcpy(kernel_buffer, buffer, result);
+        if (n != result)
+        {
+            syscall_exit_process(SYSCALL_INVALID_USERLAND_POINTER);
+        }
     }
     return result;
 }
@@ -227,7 +231,7 @@ int write_to_handle(int filehandle, void* buffer, int length) {
     n = userland_to_kernel_memcpy(buffer, kernel_buffer, length < KERNEL_BUFFER_SIZE ? length : KERNEL_BUFFER_SIZE);
     if (n < 0)
     {
-        syscall_exit_process(128);
+        syscall_exit_process(SYSCALL_INVALID_USERLAND_POINTER);
     }
         
     if (filehandle == FILEHANDLE_STDIN) {
@@ -259,7 +263,7 @@ int create_file(char* filename, int size) {
     if (status == 0) {
         return -1;
     } else if (status < 0) {
-        syscall_exit_process(128);
+        syscall_exit_process(SYSCALL_INVALID_USERLAND_POINTER);
     }
     return vfs_create(kernel_buffer, size);
 }
@@ -274,7 +278,7 @@ int remove_file(char* filename) {
     if (status == 0) {
         return -1;
     } else if (status < 0) {
-        syscall_exit_process(128);
+        syscall_exit_process(SYSCALL_INVALID_USERLAND_POINTER);
     }
     return vfs_remove(filename);
 }
@@ -290,7 +294,7 @@ int execp_process(char *filename, char argc, char **argv) {
     if (n == 0){
         return -1;
     } else if (n < 0) {
-        syscall_exit_process(128);
+        syscall_exit_process(SYSCALL_INVALID_USERLAND_POINTER);
     }
 
     if (argc >= (int)(KERNEL_BUFFER_SIZE / sizeof(void*))) {
@@ -306,24 +310,24 @@ int execp_process(char *filename, char argc, char **argv) {
         KERNEL_PANIC("should not happen as argc is already validated to be small enough\n");
     } else if (n < 0) {
         DEBUG("processdebug", "Illegal argv pointer\n", n);
-        syscall_exit_process(128);
+        syscall_exit_process(SYSCALL_INVALID_USERLAND_POINTER);
     }
     
     n_copied = 0;
     // then copy strings in argv, calculate cumulative offsets 
     for (i = 0; i < argc; i++)
     {
-	/*copy string to kernel buffer and leave argc amount of room to store the offsets  */
+        /*copy string to kernel buffer and leave argc amount of room to store the offsets  */
         DEBUG("processdebug", "trying to copy %d argument %s\n", i, ((char **)arg_buffer)[i]);
         n = userland_to_kernel_strcpy(((char **)arg_buffer)[i], arg_buffer + argc * sizeof(void*) + n_copied, sizeof(arg_buffer) - n_copied);
-	    *(int*)(arg_buffer + i * sizeof(void*)) = n_copied;
+        *(int*)(arg_buffer + i * sizeof(void*)) = n_copied;
         DEBUG("processdebug", "copy status %d\n", n);
         DEBUG("processdebug", "%d offset is %d\n",i,  n_copied) ;
         if (n == 0) {
             return -1;
         } else if (n < 0) {
             DEBUG("processdebug", "Illegal argv string pointer\n", n);
-            syscall_exit_process(128);
+            syscall_exit_process(SYSCALL_INVALID_USERLAND_POINTER);
         }
         /* count in the ending characters */
         n_copied += n + 1;
