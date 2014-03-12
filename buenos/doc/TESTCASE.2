@@ -144,7 +144,7 @@ You can run the test from the shell with following command:
 Test 9: illegalargv
 
 This tests that syscall_execp will return gracefully when given bad pointer as
-an argument.
+an argument. 
 
 You can run the test from the shell with following command:
 
@@ -152,7 +152,7 @@ You can run the test from the shell with following command:
 
 --------
 
-Test 10:strcpy
+Test 10: strcpy
 
 Tests that giving too long filename as an argument returns gracefully. It calls
 syscall_execp with a filename that is too long. The filename should result in a
@@ -161,5 +161,17 @@ failure to copy in kernel_to_userland_strcpy with a return value of 0.
 You can run the test from the shell with following command:
 
 [testi]strcpy 
+
+--------
+
+Test 11:stressexec
+
+Spawns and joins processess in an endless loop. It initializes some parameters and executes [testi]argprint with syscall_exec. 
+It waits the process to finish and prints the return value. After that it starts from the beginning. 
+This test is designed to find flaws in process_start and process_init via stress testing.
+
+You can run the test from the shell with following command:
+
+[testi]stressexec 
 
 --------

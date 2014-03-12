@@ -11,7 +11,7 @@ int main(void) {
     int i = 0;
 
     while(1) {
-        int pid = syscall_execp("[testi]argcat", argc, (const char**)ptrs);
+        int pid = syscall_execp("[testi]argprint", argc, (const char**)ptrs);
         int retval = syscall_join(pid);
         prints("return value ");
         itoa(retval, retvalbuf); 
