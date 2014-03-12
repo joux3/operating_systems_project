@@ -1,0 +1,195 @@
+OS Project, test cases for round 2
+
+Group 02
+Members 
+  Antti Risteli
+  Miro Nurmela
+  Olli-Matti Saario
+
+--------
+
+in process_init, entrypoint 4096
+ n arguments 9
+ stack ptr 7FFFEF88
+ 0, 0x7fffefac argument [testi]touch
+ 1, 0x7fffefb9 argument [testi]massaa.txt
+ 2, 0x7fffefcb argument VENICE
+ 3, 0x7fffefd2 argument BEACH
+ 4, 0x7fffefd8 argument MAXIMUM
+ 5, 0x7fffefe0 argument DUMBELL
+ 6, 0x7fffefe8 argument BENCH
+ 7, 0x7fffefee argument PRESS
+ 8, 0x7fffeff4 argument 300KG
+set arguments
+
+in process_init, entrypoint 4096
+ n arguments 2
+ stack ptr 7FFFEFD4
+ 0, 0x7fffefdc argument [testi]cat
+ 1, 0x7fffefe7 argument [testi]massaa.txt
+set arguments
+VENICE BEACH MAXIMUM DUMBELL BENCH PRESS 300KG
+read done, retrying with seek
+VENICE BEACH MAXIMUM DUMBELL BENCH PRESS 300KG
+read done
+succeeded in closing file
+process 1 exit
+return value: 0
+
+--------
+
+General:
+
+All the test cases can be found in the tests folder. Test are supposed to be run
+from the provided shell program. 
+
+First in buenos folder we initialize the disk and load all tests with command:
+
+./load_all_tests
+
+
+--------
+
+Test 0: shell 
+
+Our shell is implemented to mimic linux shell. Shell reads line input and trys
+to parse it in following manner:
+
+executable arg1 arg2 arg3 ...
+
+First it reads a line from stdin with syscall_read and parses the arguments and 
+the executable from the linebuffer. Then it calls syscall_execp and gives the 
+first argument in the linebuffer as the executable name and additional arguments 
+as argv with count argc. If process succeeds to start the shell waits it to finish with
+syscall_join and then prints the return value. Else it prints and error message.
+
+You can run the shell with command:
+
+yams buenos "initprog=[testi]shell"
+
+All the additional test programs should be run from the shell. Shell can be
+exited by calling:
+
+[testi]halt
+
+--------
+
+Test 1: halt 
+
+Halts the process by calling syscall_halt.
+
+You can run the test from the shell with following command:
+
+[testi]halt 
+
+--------
+
+Test 2: argprint 
+
+Test tests that arguments passed in the shell are transferred through to the called
+process. Test prints out the given parameters and exits. 
+
+You can run the test from the shell with following command:
+
+[testi]argprint arg1 arg2
+
+--------
+
+Test 3: touch 
+
+Touch creates new file with the desired filename given as first parameter and with
+content to be written to file given as additional parameters. It creates the
+file with syscall_create and opens it with syscall_open. then it writes all the
+content with syscall write. 
+
+You can run the test from the shell with following command:
+
+[testi]touch [testi]filename this is the content
+
+--------
+
+Test 4: cat
+
+Cat test implements a subset of the functionality of linux command line program cat.
+It first opens a file with name given as parameter with syscall_open. It then
+reads the file via buffer with syscall_read and prints it with syscall_write. As
+an added test functionality the test seeks the beginning of the file with
+syscall_seek and prints it again. After that it closes the file with
+syscall_close. 
+
+You can run the test with the following command:
+
+[testi]cat [testi]filename 
+
+In order for the test to work the file with filename given as parameter should
+exist.
+
+--------
+
+Test 5: echo
+
+Echo echoes the text given as parameter to the program back to terminal. It
+loops through all the additional arguments and prints them with syscall_write to
+stdout. 
+
+You can run the test from the shell with following command:
+
+[testi]echo i want this to be echoed
+
+--------
+
+Test 6: rm
+
+Rm deletes the file with filename given in as parameter. It calls syscall_delete
+with filename passed in as parameter.
+
+You can run the test from the shell with following command:
+
+[testi]rm [testi]filename 
+
+--------
+
+Test 7: rm
+
+Rm deletes the file with filename given in as parameter. It calls syscall_delete
+with filename passed in as parameter.
+
+You can run the test from the shell with following command:
+
+[testi]rm [testi]filename 
+
+--------
+
+Test 8: exception
+
+This test just tests that dereferencing a bad pointer in userland process
+will cause an exception but no kernel panic.
+
+You can run the test from the shell with following command:
+
+[testi]exception 
+
+--------
+
+Test 9: illegalargv
+
+This tests that syscall_execp will return gracefully when given bad pointer as
+an argument.
+
+You can run the test from the shell with following command:
+
+[testi]illegalargv 
+
+--------
+
+Test 10:strcpy
+
+Tests that giving too long filename as an argument returns gracefully. It calls
+syscall_execp with a filename that is too long. The filename should result in a
+failure to copy in kernel_to_userland_strcpy with a return value of 0.
+
+You can run the test from the shell with following command:
+
+[testi]strcpy 
+
+--------

@@ -2,15 +2,21 @@
 #include "tests/lib.h"
 
 char buffer[2049];
-int main(void) {
-    int written;
-    while(1) {
-        int read = syscall_read(stdin, buffer, 2048);
-        buffer[read++] = '\n';
-        written = 0;
-        while (written < read) {
-            written += syscall_write(stdout, buffer + written, read - written);
-        }
+int main(int argc, char **argv) {
+    if (argc > 1) {
+            int i;
+            for (i = 1; i < argc; i++) {
+                int written = 0;
+                int len = strlen(argv[i]);
+		if(i > 1)
+		{
+                    syscall_write(stdout, " " , 1 );
+		}
+                while (written < len) {
+                    written += syscall_write(stdout, (void*)(argv[i] + written), len - written);
+                } 
+            }
+	    syscall_write(stdout, "\n" , 1 );
     }
     return 0;
 }
