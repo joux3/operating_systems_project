@@ -32,6 +32,8 @@ the executable from the linebuffer. Then it calls syscall_execp and gives the
 first argument in the linebuffer as the executable name and additional arguments 
 as argv with count argc. If process succeeds to start the shell waits it to finish with
 syscall_join and then prints the return value. Else it prints and error message.
+Processes can also be started in the background by passing in & character after the
+command. When ran this way, shell doesn't call syscall_join for the new process.
 
 You can run the shell with command:
 
