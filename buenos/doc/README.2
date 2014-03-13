@@ -194,15 +194,30 @@ longest yet.
 4. Changes to the plan presented in the review session
     - none
 
+------------------
+
 Assignment 4
 
 1. Changed files
+    - The shell is implemented in the tests/shell.c file
 
 2. Description of the solution
+    - The shell is an userland piece of software which reads user input (using syscall read on
+      the stdin) and upon reading enter it will try running the software that was read with
+      the appropriate arguments (using the execp syscall)
+    - The whole program is pretty much a loop that does the previously described task and parses
+      the user input
+    - You can start programs on the background using the & in the arguments
+    - The shell features include backspace, but not much else
 
 3. Motivation behind the solution
+    - The solution is a quite bare bone solution, but you can do all the tasks required in the
+      assignment
 
 4. Changes to the plan presented in the review session
+    - None
+
+----------------------
 
 Assignment 5
 
