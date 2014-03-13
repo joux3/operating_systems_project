@@ -255,6 +255,13 @@ Assignment 5
           them safely
 
 3. Motivation behind the solution
+	Offsets and string data are passed in a single buffer to match the memory length of the
+	argument data written into the stack since int and pointer have the same size. Memory 
+overhead is also minimized with this approach. Passing the arguments by hard setting them to the 
+kernel thread registers was the only solution that didn't require remodification of source code 
+of other modules. Storing the argument data on top of the stack and lowering the stack top 
+accordingly was the simplest solution that guaranteed that the argument data would not be 
+overwritten by runtime frame data. 
 
 4. Changes to the plan presented in the review session
-    - None
+    - Changed the location where to store the argument data
