@@ -187,8 +187,22 @@ longest yet.
           copying of the appropriate elements to kernel
         
 
+    - The split between process_init and process_start was done because we wanted to separate
+      the process initialization elements (such as ELF parsing and validation) from the actual
+      running and error handling of the process
+        - This was needed, since introducing arguments to the equation made it so that there are
+          far more cases that can fail (invalid file name, illegal pointers supplied by the user,
+          and so on)
+        - ELF validation errors used to cause kernel panics, but are now handled more gracefully
+        - In addition we wrote some further ELF validation (such as overlapping read/write and readonly
+          sections and juiced up binary where entry point points to somewhere else than specified in the
+          ELF)
+        - due to the partition of initialization and other actions on process start some TLB shenanigans
+          are in order (since the thread actually running the process is not the same that initializes
+          it)
+
 3. Motivation behind the solution
-    - There were not particularly hard dwsign decision regarding the syscall implementations,
+    - There were not particularly hard design decisions regarding the syscall implementations,
       so they were implemented as leanly as possible
 
 4. Changes to the plan presented in the review session
