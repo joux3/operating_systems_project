@@ -96,13 +96,14 @@ longest yet.
         - if the copying failed (nothing was copied, a bad pointer was given or too many
           arguments were supplied), return error (and in case of the bad pointer, exit the
           process)
-        - copy the argument pointer to the kernel (there is always at least one argument, which is
+        - copy the argument pointers to the kernel (there is always at least one argument, which is
           the name of the executable file)
         - if invalid pointers are supplied, exit the process
-        - then copy the arguments kernel, as pointed out by the argument pointer and the amount
+        - then copy the arguments to kernel, as pointed out by the argument pointers and the amount
           of arguments (and some sweet pointer arithmetic!)
         - again, in case of illegal pointers, exit the process and in case of failed copies return
           a note of that
+        - while copying, calculate offsets for each argument on the common buffer
         - after everything is safely copied to the kernel, call process start with the arguments
 
     - syscall_join(int process_id):
@@ -236,9 +237,24 @@ Assignment 4
 Assignment 5
 
 1. Changed files
+    - proc/process.c (copying arguments from kernel memory to the virtual memory of new process)
+    - proc/syscall.c (copying of arguments to kernel memory)
 
 2. Description of the solution
+    - in syscall_execp
+        - argv and strings pointed by argv are safely copied to a kernel buffer
+        - proper string pointers are replaced by string start offsets on a common buffer
+    - in process_start
+        - move the userland stack top down for arguments to fit over the stack in userland memory
+        - argument offsets and the actual strings are copied to userland memory
+        - argument offsets get turned into pointers that point to the strings in userland memory
+    - in process_init
+        - CPU registers A0 and A1 in the userland context are modified to pass the argc and argv 
+          arguments
+        - memory for 2 arguments on the stack is reserved so that the userland process can copy
+          them safely
 
 3. Motivation behind the solution
 
 4. Changes to the plan presented in the review session
+    - None
