@@ -79,7 +79,7 @@ void sleepq_init(void)
     int i;
 
     for (i=0; i<SLEEPQ_HASHTABLE_SIZE; i++) {
-	sleepq_hashtable[i] = -1;
+        sleepq_hashtable[i] = -1;
     }
 
     spinlock_reset(&sleepq_slock);
@@ -105,7 +105,7 @@ void sleepq_add(void *resource)
     /* Interrupts _must_ be disabled when calling this function: */
     intr_state = _interrupt_get_state();
     KERNEL_ASSERT((intr_state & INTERRUPT_MASK_ALL) == 0 
-		  || !(intr_state & INTERRUPT_MASK_MASTER));
+                  || !(intr_state & INTERRUPT_MASK_MASTER));
 
     hash = SLEEPQ_HASH(resource);
     my_tid = thread_get_current_thread();
@@ -120,16 +120,16 @@ void sleepq_add(void *resource)
 
     /* Add the current thread to the end of the sleepqueue */
     if (sleepq_hashtable[hash] <= 0) {
-	/* hashtable entry empty */
-	sleepq_hashtable[hash] = my_tid;
+        /* hashtable entry empty */
+        sleepq_hashtable[hash] = my_tid;
     } else {
-	TID_t prev;
-	/* hashtable entry nonempty, chain to end of linked list */
-	prev = sleepq_hashtable[hash];
-	while (thread_table[prev].next > 0) {
-	    prev = thread_table[prev].next;
-	}
-	thread_table[prev].next = my_tid;
+        TID_t prev;
+        /* hashtable entry nonempty, chain to end of linked list */
+        prev = sleepq_hashtable[hash];
+        while (thread_table[prev].next > 0) {
+            prev = thread_table[prev].next;
+        }
+        thread_table[prev].next = my_tid;
     }
 
     spinlock_release(&sleepq_slock);
@@ -162,34 +162,34 @@ void sleepq_wake(void *resource)
     prev = -1;
     first = sleepq_hashtable[hash];
     while (first > 0 && thread_table[first].sleeps_on != (uint32_t)resource) {
-	prev = first;
-	first = thread_table[first].next;
+        prev = first;
+        first = thread_table[first].next;
     }
 
     /* First entry with correct resource found */
     if (first > 0) {
-	/* remove it from the sleep queue */
-	if (prev <= 0) { 
-	    /* it was the first entry in the table slot */
-	    sleepq_hashtable[hash] = thread_table[first].next;
-	} else {
-	    thread_table[prev].next = thread_table[first].next;
-	}
+        /* remove it from the sleep queue */
+        if (prev <= 0) { 
+            /* it was the first entry in the table slot */
+            sleepq_hashtable[hash] = thread_table[first].next;
+        } else {
+            thread_table[prev].next = thread_table[first].next;
+        }
 
-	/* Clear the sleeps_on field and add the thread to the ready
-	 * list (if necessary)
-	 */
-	spinlock_acquire(&thread_table_slock);
+        /* Clear the sleeps_on field and add the thread to the ready
+         * list (if necessary)
+         */
+        spinlock_acquire(&thread_table_slock);
 
-	thread_table[first].sleeps_on = 0;
-	thread_table[first].next = -1;
-	
-	if (thread_table[first].state == THREAD_SLEEPING) {
-	    thread_table[first].state = THREAD_READY;
-	    scheduler_add_to_ready_list(first);
-	}
+        thread_table[first].sleeps_on = 0;
+        thread_table[first].next = -1;
+        
+        if (thread_table[first].state == THREAD_SLEEPING) {
+            thread_table[first].state = THREAD_READY;
+            scheduler_add_to_ready_list(first);
+        }
 
-	spinlock_release(&thread_table_slock);
+        spinlock_release(&thread_table_slock);
     }
 
     spinlock_release(&sleepq_slock);
@@ -221,41 +221,41 @@ void sleepq_wake_all(void *resource)
     /* Traverse the whole linked list in order to wake up all threads */
     while (first > 0) {
 
-	/* Find the next entry actually waiting for 'resource', since
-	 * multiple resources may hash to the same index. 
-	 */
-	while (first > 0 
-	       && thread_table[first].sleeps_on != (uint32_t)resource) {
-	    prev = first;
-	    first = thread_table[first].next;
-	}
+        /* Find the next entry actually waiting for 'resource', since
+         * multiple resources may hash to the same index. 
+         */
+        while (first > 0 
+               && thread_table[first].sleeps_on != (uint32_t)resource) {
+            prev = first;
+            first = thread_table[first].next;
+        }
 
-	/* Next entry w/ resource found */
-	if (first > 0) {
-	    wake = first;
-	    /* remove it from the sleep queue */
-	    if (prev <= 0) { 
-		/* it was the first entry in the table slot */
-		first = sleepq_hashtable[hash] = thread_table[wake].next;
-	    } else {
-		first = thread_table[prev].next = thread_table[wake].next;
-	    }
+        /* Next entry w/ resource found */
+        if (first > 0) {
+            wake = first;
+            /* remove it from the sleep queue */
+            if (prev <= 0) { 
+                /* it was the first entry in the table slot */
+                first = sleepq_hashtable[hash] = thread_table[wake].next;
+            } else {
+                first = thread_table[prev].next = thread_table[wake].next;
+            }
 
-	    /* Clear the sleeps_on field and add the thread to the ready
-	     * list (if necessary)
-	     */
-	    spinlock_acquire(&thread_table_slock);
+            /* Clear the sleeps_on field and add the thread to the ready
+             * list (if necessary)
+             */
+            spinlock_acquire(&thread_table_slock);
 
-	    thread_table[wake].sleeps_on = 0;
-	    thread_table[wake].next      = -1;
-	
-	    if (thread_table[wake].state == THREAD_SLEEPING) {
-		thread_table[wake].state = THREAD_READY;
-		scheduler_add_to_ready_list(wake);
-	    }
+            thread_table[wake].sleeps_on = 0;
+            thread_table[wake].next      = -1;
+        
+            if (thread_table[wake].state == THREAD_SLEEPING) {
+                thread_table[wake].state = THREAD_READY;
+                scheduler_add_to_ready_list(wake);
+            }
 
-	    spinlock_release(&thread_table_slock);
-	}
+            spinlock_release(&thread_table_slock);
+        }
     }
 
     spinlock_release(&sleepq_slock);

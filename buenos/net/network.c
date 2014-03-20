@@ -100,13 +100,13 @@ static int network_receive_frame(network_frame_t *frame)
     frame_handler_t frame_handler;
     
     frame_handler = 
-	protocols_get_frame_handler(frame->header.protocol_id);
+        protocols_get_frame_handler(frame->header.protocol_id);
     if(frame_handler != NULL) {
-	/* found handler, known protocol */
-	return frame_handler(frame->header.source,
-				 frame->header.destination,
-				 frame->header.protocol_id,
-				 frame->payload);
+        /* found handler, known protocol */
+        return frame_handler(frame->header.source,
+                                 frame->header.destination,
+                                 frame->header.protocol_id,
+                                 frame->payload);
     }
 
     return 0;
@@ -128,21 +128,21 @@ static void network_receive_thread(uint32_t interface)
     gnd = network_interfaces[interface].gnd;
 
     while(1) {
-	if(ret != 0) {
-	    /* We need new page */
-	    frame_phys_addr = pagepool_get_phys_page();
-	    KERNEL_ASSERT(frame_phys_addr != 0);
-	    frame = (network_frame_t *) ADDR_PHYS_TO_KERNEL(frame_phys_addr);
-	}
+        if(ret != 0) {
+            /* We need new page */
+            frame_phys_addr = pagepool_get_phys_page();
+            KERNEL_ASSERT(frame_phys_addr != 0);
+            frame = (network_frame_t *) ADDR_PHYS_TO_KERNEL(frame_phys_addr);
+        }
 
-	ret = 0;
+        ret = 0;
 
         /* Receive a frame. This call blocks until frame is transfered
            to memory. */
-	if(gnd->recv(gnd, (void *) frame_phys_addr) == 0) {
-	    /* success */
-	    ret = network_receive_frame(frame);
-	}
+        if(gnd->recv(gnd, (void *) frame_phys_addr) == 0) {
+            /* success */
+            ret = network_receive_frame(frame);
+        }
     }
 }
 
@@ -157,27 +157,27 @@ void network_init(void)
 
     /* Find all network devices in system */
     for(i=0; i<CONFIG_MAX_GNDS; i++) {
-	dev = device_get(YAMS_TYPECODE_NIC, i);
-	if(dev == NULL) {
+        dev = device_get(YAMS_TYPECODE_NIC, i);
+        if(dev == NULL) {
             /* No more GNDs. Initialize to invalid. */
-	    network_interfaces[i].gnd = NULL;
-	    network_interfaces[i].address = 0;
-	} else {
+            network_interfaces[i].gnd = NULL;
+            network_interfaces[i].address = 0;
+        } else {
             /* Initialize this entry. */
-	    gnd_t *gnd;
+            gnd_t *gnd;
 
-	    gnd = (gnd_t *) dev->generic_device;
+            gnd = (gnd_t *) dev->generic_device;
 
-	    network_interfaces[i].gnd = gnd;
-	    network_interfaces[i].mtu = gnd->frame_size(gnd);
+            network_interfaces[i].gnd = gnd;
+            network_interfaces[i].mtu = gnd->frame_size(gnd);
 
             /* The network code is unable to handle frames which don't
                fit into one page. This is because there is no way to
                allocate two consecutive memory pages. */
-	    KERNEL_ASSERT(network_interfaces[i].mtu <= PAGE_SIZE);
+            KERNEL_ASSERT(network_interfaces[i].mtu <= PAGE_SIZE);
 
-	    network_interfaces[i].address = gnd->hwaddr(gnd);
-	}
+            network_interfaces[i].address = gnd->hwaddr(gnd);
+        }
     }
 
     /* Initialize sockets. Should be done before protocol inits*/
@@ -188,19 +188,19 @@ void network_init(void)
     /* Create and start a receiving thread for each network
        interface. */
     for(i=0; i<CONFIG_MAX_GNDS; i++) {
-	if(network_interfaces[i].gnd != NULL) {
-	    TID_t tid;
-	    tid = thread_create(&network_receive_thread, i);
+        if(network_interfaces[i].gnd != NULL) {
+            TID_t tid;
+            tid = thread_create(&network_receive_thread, i);
             /* Thread creation should succeed. If not, increase the
                number of threads in the system by editing config.h. */
-	    KERNEL_ASSERT(tid > 0);
-	    thread_run(tid);
-	    kprintf("Network: started network services on device "
-		    "at address %8.8x\n", 
-		    network_interfaces[i].address);
-	} else {
-	    break;
-	}
+            KERNEL_ASSERT(tid > 0);
+            thread_run(tid);
+            kprintf("Network: started network services on device "
+                    "at address %8.8x\n", 
+                    network_interfaces[i].address);
+        } else {
+            break;
+        }
     }
 }
 
@@ -216,7 +216,7 @@ void network_init(void)
 network_address_t network_get_source_address(int interface)
 {
     if(interface<0 || interface>= CONFIG_MAX_GNDS)
-	return 0;
+        return 0;
 
     return network_interfaces[interface].address;
 }
@@ -256,24 +256,24 @@ int network_get_mtu(network_address_t local_address)
     int min=NETWORK_MAX_MTU+1;
 
     if(local_address == NETWORK_BROADCAST_ADDRESS) {
-	/* Find minimum MTU */
-	for(n = network_interfaces; n->gnd != NULL; n++) {
-	    if(n->mtu < min)
-		min = n->mtu;
-	}
-	
-	return (min - sizeof(network_frame_header_t));
+        /* Find minimum MTU */
+        for(n = network_interfaces; n->gnd != NULL; n++) {
+            if(n->mtu < min)
+                min = n->mtu;
+        }
+        
+        return (min - sizeof(network_frame_header_t));
     } else if(local_address == NETWORK_LOOPBACK_ADDRESS) {
         return (PAGE_SIZE - sizeof(network_frame_header_t)); 
     } else {
-	/* Find MTU of given interface address. */
-	for(n = network_interfaces; n->gnd != NULL; n++) {
-	    if(n->address == local_address)
-		return (n->mtu - sizeof(network_frame_header_t));
-	}
+        /* Find MTU of given interface address. */
+        for(n = network_interfaces; n->gnd != NULL; n++) {
+            if(n->address == local_address)
+                return (n->mtu - sizeof(network_frame_header_t));
+        }
 
-	/* not found */
-	return 0;
+        /* not found */
+        return 0;
     }
 }
 
@@ -290,8 +290,8 @@ static int network_get_interface(network_address_t local_address)
     
 
     for(i = 0; i<CONFIG_MAX_GNDS; i++) {
-	if(network_interfaces[i].address == local_address)
-	    return i;
+        if(network_interfaces[i].address == local_address)
+            return i;
     }
 
     /* not found */
@@ -310,15 +310,15 @@ static int network_get_interface(network_address_t local_address)
  * @return 0 on success. Other values indicate failure.
  */
 static int network_send_interface(int interface,
-				  network_address_t destination,
-				  network_frame_t *frame)
+                                  network_address_t destination,
+                                  network_frame_t *frame)
 {
     gnd_t *gnd;
 
     gnd = network_interfaces[interface].gnd;
     return gnd->send(gnd, 
-		     (void *) ADDR_KERNEL_TO_PHYS((uint32_t) frame), 
-		     destination);
+                     (void *) ADDR_KERNEL_TO_PHYS((uint32_t) frame), 
+                     destination);
 }
 
 /**
@@ -341,10 +341,10 @@ static int network_send_interface(int interface,
  * @return Generic network error codes.
  */
 int network_send(network_address_t source,
-		 network_address_t destination,
-		 uint32_t protocol_id,
-		 int length,
-		 void *buffer)
+                 network_address_t destination,
+                 uint32_t protocol_id,
+                 int length,
+                 void *buffer)
 {
     uint32_t phys_frame;
     network_frame_t *frame;
@@ -352,12 +352,12 @@ int network_send(network_address_t source,
 
     /* The frame should fit into one page. */
     KERNEL_ASSERT(length > 0 &&
-		  length <= (int)(PAGE_SIZE-sizeof(network_frame_header_t)));
+                  length <= (int)(PAGE_SIZE-sizeof(network_frame_header_t)));
 
     /* Allocate a page for this frame. */
     phys_frame = pagepool_get_phys_page();
     if(phys_frame == 0)
-	return NET_ERROR;
+        return NET_ERROR;
     frame = (network_frame_t *) ADDR_PHYS_TO_KERNEL(phys_frame);
 
     /* Initialize the frame header. */
@@ -368,43 +368,43 @@ int network_send(network_address_t source,
 
     /* If loopback, push the frame immediately to the upper layers. */
     if(destination == NETWORK_LOOPBACK_ADDRESS) {
-	if(frame->header.source == NETWORK_BROADCAST_ADDRESS)
-	    frame->header.source = NETWORK_LOOPBACK_ADDRESS;
-	if(network_receive_frame(frame) == 0) {
-	    /* push failed */
-	    pagepool_free_phys_page(phys_frame);
-	    return NET_ERROR;
-	}
-	
-	return NET_OK;
+        if(frame->header.source == NETWORK_BROADCAST_ADDRESS)
+            frame->header.source = NETWORK_LOOPBACK_ADDRESS;
+        if(network_receive_frame(frame) == 0) {
+            /* push failed */
+            pagepool_free_phys_page(phys_frame);
+            return NET_ERROR;
+        }
+        
+        return NET_OK;
     }
 
     /* If source is not broadcast, find the given interface and send
        the frame. */
     if(source != NETWORK_BROADCAST_ADDRESS) {
-	int interface;
+        int interface;
 
-	interface = network_get_interface(source);
-	if(interface < 0) {
+        interface = network_get_interface(source);
+        if(interface < 0) {
             /* No such interface. */
-	    pagepool_free_phys_page(phys_frame);
-	    return NET_DOESNT_EXIST;
-	}
+            pagepool_free_phys_page(phys_frame);
+            return NET_DOESNT_EXIST;
+        }
 
-	if(network_send_interface(interface, destination, frame) != 0)
-	    send_ret = NET_ERROR;
+        if(network_send_interface(interface, destination, frame) != 0)
+            send_ret = NET_ERROR;
     } else {
         /* Source is broadcast. Send the the packet through all
            interfaces. */
-	int interface;
+        int interface;
 
-	for(interface=0; interface<CONFIG_MAX_GNDS; interface++) {
-	    if(network_interfaces[interface].gnd == NULL)
-		break;
+        for(interface=0; interface<CONFIG_MAX_GNDS; interface++) {
+            if(network_interfaces[interface].gnd == NULL)
+                break;
 
-	    if(network_send_interface(interface, destination, frame) != 0)
-		send_ret = NET_ERROR;
-	}
+            if(network_send_interface(interface, destination, frame) != 0)
+                send_ret = NET_ERROR;
+        }
     }
 
     pagepool_free_phys_page(phys_frame);
@@ -420,7 +420,7 @@ int network_send(network_address_t source,
 void network_free_frame(void *payload_frame)
 {
     uint32_t frame = ADDR_KERNEL_TO_PHYS((uint32_t)payload_frame) 
-	& PAGE_SIZE_MASK;
+        & PAGE_SIZE_MASK;
     pagepool_free_phys_page(frame);
 }
 

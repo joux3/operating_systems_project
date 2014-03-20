@@ -147,27 +147,27 @@ int bitmap_findnset(bitmap_t *bitmap, int l)
 
     /* Loop through words until a one with at least one free bit is found. */
     for (i = 0; i < bitmap_sizeof(l)/4; i++) {
-	if (bitmap[i] != 0xffffffff) {
-	    /* At least one bit in this word is zero */
-	    int basepos=i*32; /* Bit position of the first bit in this word. */
+        if (bitmap[i] != 0xffffffff) {
+            /* At least one bit in this word is zero */
+            int basepos=i*32; /* Bit position of the first bit in this word. */
 
-	    /* Loop through the bits in the word until the free bit is found.*/
-	    for (j = 0; j < 32; j++) {
-		if (bitmap_get(bitmap, basepos+j) == 0) {
-		    if (basepos+j >= l) {
-			/* we are in the last word in the bitmap, but
-			   it is not fully in use and the first "free"
-			   bit is in unused portion -> return "not found". */
-			return -1;
-		    }
+            /* Loop through the bits in the word until the free bit is found.*/
+            for (j = 0; j < 32; j++) {
+                if (bitmap_get(bitmap, basepos+j) == 0) {
+                    if (basepos+j >= l) {
+                        /* we are in the last word in the bitmap, but
+                           it is not fully in use and the first "free"
+                           bit is in unused portion -> return "not found". */
+                        return -1;
+                    }
 
-		    bitmap_set(bitmap, basepos+j, 1);
-		    return (basepos+j);
-		}
-	    }		
-	}
+                    bitmap_set(bitmap, basepos+j, 1);
+                    return (basepos+j);
+                }
+            }                
+        }
     }
-	
+        
     /* No free slots found */
     return -1;
 }
