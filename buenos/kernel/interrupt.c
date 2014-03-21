@@ -88,16 +88,16 @@ void interrupt_init(int num_cpus) {
      * will contain the same code.
      */
     for(i = 0 ; i < INTERRUPT_VECTOR_LENGTH ; i++) {
-	iv_area1[i] = ((uint32_t *) &_cswitch_vector_code)[i];
-	iv_area2[i] = ((uint32_t *) &_cswitch_vector_code)[i];
-	iv_area3[i] = ((uint32_t *) &_cswitch_vector_code)[i];
+        iv_area1[i] = ((uint32_t *) &_cswitch_vector_code)[i];
+        iv_area2[i] = ((uint32_t *) &_cswitch_vector_code)[i];
+        iv_area3[i] = ((uint32_t *) &_cswitch_vector_code)[i];
     }
 
     /* Initialize the handler table to empty */
     for (i=0; i<CONFIG_MAX_DEVICES; i++) {
-	interrupt_handlers[i].device = NULL;
-	interrupt_handlers[i].irq = 0;
-	interrupt_handlers[i].handler = NULL;
+        interrupt_handlers[i].device = NULL;
+        interrupt_handlers[i].irq = 0;
+        interrupt_handlers[i].handler = NULL;
     }
 }
 
@@ -112,15 +112,15 @@ void interrupt_init(int num_cpus) {
  * given as a parameter for handler
  */
 void interrupt_register(uint32_t irq,
-			void (*handler)(device_t *),
-			device_t *device)
+                        void (*handler)(device_t *),
+                        device_t *device)
 {
     int i = 0;
 
     /* Check that IRQ mask is sane */
     if ((irq & ~(uint32_t)INTERRUPT_MASK_ALL)!= 0) {
-	kprintf("Unsupported IRQ mask:%.8x\n", irq);
-	KERNEL_PANIC("interrupt_register");
+        kprintf("Unsupported IRQ mask:%.8x\n", irq);
+        KERNEL_PANIC("interrupt_register");
     }
 
     /* No need for spinlock, this should not be called after other CPUs
@@ -130,7 +130,7 @@ void interrupt_register(uint32_t irq,
     while (interrupt_handlers[i].device != NULL && i < CONFIG_MAX_DEVICES) i++;
 
     if (i >= CONFIG_MAX_DEVICES)
-	KERNEL_PANIC("Interrupt handler table is full");
+        KERNEL_PANIC("Interrupt handler table is full");
 
     interrupt_handlers[i].device = device;
     interrupt_handlers[i].irq = irq;
@@ -158,8 +158,8 @@ void interrupt_handle(uint32_t cause) {
 
     /* Exceptions should be handled elsewhere: */
     if((cause  & 0x0000007c) != 0) {
-	kprintf("Caught exception, cause %.8x, CPU %i\n", cause, this_cpu);
-	KERNEL_PANIC("Exception in interrupt_handle");
+        kprintf("Caught exception, cause %.8x, CPU %i\n", cause, this_cpu);
+        KERNEL_PANIC("Exception in interrupt_handle");
     }
 
 
@@ -168,14 +168,14 @@ void interrupt_handle(uint32_t cause) {
      * also empty.
      */
     for (i=0; i<CONFIG_MAX_DEVICES; i++) {
-	if (interrupt_handlers[i].device == NULL)
-	    break;
-	
-	/* If this handler is registered for any of the interrupts
-	 * that occured, call it.
-	 */
-	if ((cause & interrupt_handlers[i].irq) != 0)
-	    interrupt_handlers[i].handler(interrupt_handlers[i].device);
+        if (interrupt_handlers[i].device == NULL)
+            break;
+        
+        /* If this handler is registered for any of the interrupts
+         * that occured, call it.
+         */
+        if ((cause & interrupt_handlers[i].irq) != 0)
+            interrupt_handlers[i].handler(interrupt_handlers[i].device);
     }
 
 
@@ -183,20 +183,20 @@ void interrupt_handle(uint32_t cause) {
      * Also call scheduler if we're running the idle thread.
      */
     if((cause & (INTERRUPT_CAUSE_SOFTWARE_0 |
-		 INTERRUPT_CAUSE_HARDWARE_5)) ||
+                 INTERRUPT_CAUSE_HARDWARE_5)) ||
        scheduler_current_thread[this_cpu] == IDLE_THREAD_TID) {
-	scheduler_schedule();
-	
-	/* Until we have proper VM we must manually fill
-	   the TLB with pagetable entries before running code using
-	   given pagetable. Note that this method limits pagetable
-	   rows (possible mapping pairs) to 16 and can't be used
-	   with proper pagetables and VM.
+        scheduler_schedule();
+        
+        /* Until we have proper VM we must manually fill
+           the TLB with pagetable entries before running code using
+           given pagetable. Note that this method limits pagetable
+           rows (possible mapping pairs) to 16 and can't be used
+           with proper pagetables and VM.
 
            Note that if you remove this call (which you probably do when
            you implement proper VM), you must manually call _tlb_set_asid
            here. See the implementation of tlb_fill on details how to do that.
         */
-	tlb_fill(thread_get_current_thread_entry()->pagetable);
+        tlb_fill(thread_get_current_thread_entry()->pagetable);
     }
 }
