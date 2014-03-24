@@ -46,14 +46,22 @@ fs_t * sfs_init(gbd_t *disk)
     uint32_t addr;
     uint32_t buffer[SFS_BLOCK_SIZE / sizeof(uint32_t)];
     int r;
+    lock_t *lock;
 
     KERNEL_ASSERT(SFS_BLOCK_SIZE >= sizeof(sfs_inode_t));
 
     if (disk->block_size(disk) != SFS_BLOCK_SIZE)
         return NULL;
 
+    lock = lock_create();
+    if (lock == NULL) {
+        kprintf("sfs_init: could not create a new lock.\n");
+        return NULL;
+    }
+
     addr = pagepool_get_phys_page();
     if (addr == 0) {
+        lock_destroy(lock);
         kprintf("sfs_init: could not allocate memory.\n");
         return NULL;
     }
@@ -67,12 +75,14 @@ fs_t * sfs_init(gbd_t *disk)
     req.buf = ADDR_KERNEL_TO_PHYS((uint32_t)&buffer);
     r = disk->read_block(disk, &req);
     if (r == 0) {
+        lock_destroy(lock);
         pagepool_free_phys_page(ADDR_KERNEL_TO_PHYS(addr));
         kprintf("sfs_init: Error during disk read. Initialization failed.\n");
         return NULL; 
     }
 
     if (buffer[0] != SFS_MAGIC) {
+        lock_destroy(lock);
         pagepool_free_phys_page(ADDR_KERNEL_TO_PHYS(addr));
         return NULL;
     }
@@ -82,6 +92,8 @@ fs_t * sfs_init(gbd_t *disk)
     sfs = (sfs_t*)(addr + sizeof(fs_t));
 
     sfs->disk = disk;
+    sfs->lock = lock;
+
     fs->internal = (void*)sfs; 
     stringcopy(fs->volume_name, name, VFS_NAME_LENGTH);
 
