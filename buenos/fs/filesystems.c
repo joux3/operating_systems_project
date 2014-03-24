@@ -36,12 +36,18 @@
 
 #include "fs/filesystems.h"
 #include "fs/tfs.h"
+#ifdef CHANGED_3
+    #include "fs/sfs.h"
+#endif
 #include "drivers/device.h"
 
 /* NULL terminated table of all available filesystems. */
 
 static filesystems_t filesystems[] = {
     {"TFS", &tfs_init},
+#ifdef CHANGED_3
+    {"SFS", &sfs_init},
+#endif
     { NULL, NULL} /* Last entry must be a NULL pair. */ 
 };
 
@@ -60,13 +66,13 @@ fs_t *filesystems_try_all(gbd_t *disk)
     fs_t *fs;
 
     for(driver=filesystems; driver->name != NULL; driver++) {
-	fs=driver->init(disk);
-	if(fs!=NULL) {
-	    /* Init succeeded. */
-	    kprintf("VFS: %s initialized on disk at 0x%8.8x\n",
-		    driver->name, disk->device->io_address);
-	    return fs;
-	}
+        fs=driver->init(disk);
+        if(fs!=NULL) {
+            /* Init succeeded. */
+            kprintf("VFS: %s initialized on disk at 0x%8.8x\n",
+        	    driver->name, disk->device->io_address);
+            return fs;
+        }
     }
 
     /* No match. */
