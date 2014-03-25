@@ -23,6 +23,13 @@ typedef struct {
 
     // lock for mutual exclusion of fs-operations
     lock_t    *lock;
+
+    uint32_t root_inode;
+
+    // block allocation block count
+    uint32_t bab_count;
+
+    uint32_t block_count;
 } sfs_t;
 
 
@@ -93,6 +100,9 @@ fs_t * sfs_init(gbd_t *disk)
 
     sfs->disk = disk;
     sfs->lock = lock;
+    sfs->block_count = disk->total_blocks(disk);
+    sfs->bab_count = ((sfs->block_count - 1) + 1024)/1025;
+    sfs->root_inode = sfs->bab_count + 1;
 
     fs->internal = (void*)sfs; 
     stringcopy(fs->volume_name, name, VFS_NAME_LENGTH);
@@ -122,8 +132,14 @@ fs_t * sfs_init(gbd_t *disk)
  */
 int sfs_unmount(fs_t *fs) 
 {
-    fs = fs;
-    return VFS_ERROR;
+    sfs_t *sfs;
+    sfs = (sfs_t*)fs->internal;
+
+    lock_acquire(sfs->lock); 
+
+    lock_destroy(sfs->lock); 
+    pagepool_free_phys_page(ADDR_KERNEL_TO_PHYS((uint32_t)fs));
+    return VFS_OK;
 }
 
 
