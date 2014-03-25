@@ -47,7 +47,7 @@ typedef struct {
     char name[SFS_FILENAME_MAX];
 } sfs_dir_entry_t;
 
-#define SFS_ENTRIES_PER_DIR ((SFS_BLOCK_SIZE - 2*sizeof(uint32_t)) / sizeof(dir_entry_t))
+#define SFS_ENTRIES_PER_DIR ((SFS_BLOCK_SIZE - 2*sizeof(uint32_t)) / sizeof(sfs_dir_entry_t))
 
 typedef struct {
     uint32_t next_dir_inode; // 0 when no next

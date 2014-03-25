@@ -33,7 +33,15 @@ typedef struct {
     uint32_t block_count;
 
     // allocate here to save stack space
-    char bab_buffer[SFS_BLOCK_SIZE];
+    union {
+        char buffer[SFS_BLOCK_SIZE];
+        bitmap_t bitmap;
+    } bab;
+    union {
+        char buffer[SFS_BLOCK_SIZE];
+        sfs_inode_t node;
+    } inode;
+    // only use stack reservations when not holding sfs->lock
 } sfs_t;
 
 #define SFS_BLOCKS_PER_BAB (SFS_BLOCK_SIZE * 8)
@@ -49,13 +57,26 @@ int sfs_is_block_free(sfs_t *sfs, uint32_t block) {
     
     req.block = bab_block + 1; // first block is the magic block
     req.sem = NULL;
-    req.buf = ADDR_KERNEL_TO_PHYS((uint32_t)&(sfs->bab_buffer));
+    req.buf = ADDR_KERNEL_TO_PHYS((uint32_t)&(sfs->bab.buffer));
     r = sfs->disk->read_block(sfs->disk, &req);
     KERNEL_ASSERT(r != 0);
 
     offset_in_bab = block - bab_block * SFS_BLOCKS_PER_BAB;
 
-    return bitmap_get((bitmap_t*)sfs->bab_buffer, offset_in_bab);
+    return bitmap_get(&(sfs->bab.bitmap), offset_in_bab);
+}
+
+uint32_t sfs_root_inode(sfs_t *sfs) {
+    return 1 + sfs->bab_count; 
+}
+
+int sfs_read_block(sfs_t *sfs, uint32_t block, void *buffer) {
+    gbd_request_t req;
+
+    req.block = block;
+    req.sem = NULL;
+    req.buf = ADDR_KERNEL_TO_PHYS((uint32_t)buffer);
+    return sfs->disk->read_block(sfs->disk, &req);
 }
 
 /** 
@@ -141,7 +162,7 @@ fs_t * sfs_init(gbd_t *disk)
         return NULL;
     }
     // - check that the root inode is a directory
-    req.block = 1 + sfs->bab_count;
+    req.block = sfs_root_inode(sfs);
     req.sem = NULL;
     req.buf = ADDR_KERNEL_TO_PHYS((uint32_t)&buffer);
     r = disk->read_block(disk, &req);
@@ -242,9 +263,46 @@ int sfs_close(fs_t *fs, int fileid)
  */
 int sfs_create(fs_t *fs, char *filename, int size) 
 {
-    fs = fs;
-    filename = filename;
-    size = size;
+    sfs_t *sfs = (sfs_t*)fs->internal;
+    gbd_request_t req;
+    int r, i;
+    uint32_t next_dir_inode;
+    sfs_inode_dir_t *dir_inode;
+     
+    if ((uint32_t)size > SFS_MAX_FILESIZE) {
+        return VFS_ERROR;
+    }
+
+    lock_acquire(sfs->lock);
+
+    // check if the file exists or not
+    next_dir_inode = sfs_root_inode(sfs); 
+    while (next_dir_inode != 0) {
+        req.block = next_dir_inode;
+        req.sem = NULL;
+        req.buf = ADDR_KERNEL_TO_PHYS((uint32_t)sfs->inode.buffer);
+        r = sfs->disk->read_block(sfs->disk, &req);
+        if (r == 0) {
+            lock_release(sfs->lock);
+            return VFS_ERROR;
+        }
+        if (sfs->inode.node.inode_type != SFS_DIR_INODE) {
+            kprintf("SFS: inode should be dir but isn't! inode %d\n", next_dir_inode);
+            KERNEL_PANIC("SFS: corrupted filesystem!\n");
+        }
+        dir_inode = &(sfs->inode.node.dir);
+        for (i = 0; i < (int)SFS_ENTRIES_PER_DIR; i++) {
+            if (dir_inode->entries[i].inode > 0 && stringcmp(dir_inode->entries[i].name, filename) == 0) {
+                DEBUG("sfsdebug", "SFS sfs_create: File %s already exists!", filename);
+                lock_release(sfs->lock);
+                return VFS_ERROR;
+            }
+        } 
+        next_dir_inode = dir_inode->next_dir_inode;
+    }
+
+    lock_release(sfs->lock);
+
     return VFS_ERROR;
 }
 
