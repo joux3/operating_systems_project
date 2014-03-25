@@ -33,15 +33,19 @@ typedef struct {
     uint32_t data_block_count;
 
     // allocate here to save stack space
+    // NOTE: do not use these when not holding sfs->lock
     union {
         char buffer[SFS_BLOCK_SIZE];
         bitmap_t bitmap;
     } bab;
-    union {
+    union { 
         char buffer[SFS_BLOCK_SIZE];
         sfs_inode_t node;
     } inode;
-    // only use stack reservations when not holding sfs->lock
+    // reserve space for some indirect block pointer handling
+    uint32_t indirect1[SFS_BLOCK_SIZE / sizeof(uint32_t)];
+    uint32_t indirect2[SFS_BLOCK_SIZE / sizeof(uint32_t)];
+    uint32_t indirect3[SFS_BLOCK_SIZE / sizeof(uint32_t)];
 } sfs_t;
 
 #define SFS_BLOCKS_PER_BAB (SFS_BLOCK_SIZE * 8)
@@ -92,7 +96,7 @@ uint32_t sfs_get_free_block(sfs_t *sfs) {
         free_block = bitmap_findnset(&(sfs->bab.bitmap), in_this_bab);
         if (free_block != -1) {
             KERNEL_ASSERT(sfs_write_block(sfs, 1 + i, &(sfs->bab.buffer)) != 0); 
-            return (i * SFS_BLOCKS_PER_BAB) + (uint32_t)free_block;
+            return 1 + sfs->bab_count + (i * SFS_BLOCKS_PER_BAB) + (uint32_t)free_block;
         }
     }
     return 0;
@@ -286,8 +290,9 @@ int sfs_create(fs_t *fs, char *filename, int size)
 {
     sfs_t *sfs = (sfs_t*)fs->internal;
     int r, i;
-    uint32_t next_dir_inode;
+    uint32_t cur_dir_block, dir_inode_with_free_entry;
     sfs_inode_dir_t *dir_inode;
+    dir_inode_with_free_entry = 0;
      
     if ((uint32_t)size > SFS_MAX_FILESIZE) {
         return VFS_ERROR;
@@ -296,29 +301,82 @@ int sfs_create(fs_t *fs, char *filename, int size)
     lock_acquire(sfs->lock);
 
     // check if the file exists or not
-    next_dir_inode = sfs_root_inode(sfs); 
-    while (next_dir_inode != 0) {
-        r = sfs_read_block(sfs, next_dir_inode, &(sfs->inode.buffer));
+    cur_dir_block = sfs_root_inode(sfs); 
+    while (cur_dir_block != 0) {
+        r = sfs_read_block(sfs, cur_dir_block, &(sfs->inode.buffer));
         if (r == 0) {
             lock_release(sfs->lock);
             return VFS_ERROR;
         }
         if (sfs->inode.node.inode_type != SFS_DIR_INODE) {
-            kprintf("SFS: inode should be dir but isn't! inode %d\n", next_dir_inode);
+            kprintf("SFS: inode should be dir but isn't! inode %d\n", cur_dir_block);
             KERNEL_PANIC("SFS: corrupted filesystem!\n");
         }
         dir_inode = &(sfs->inode.node.dir);
         for (i = 0; i < (int)SFS_ENTRIES_PER_DIR; i++) {
+            if (dir_inode->entries[i].inode == 0 && dir_inode_with_free_entry == 0) {
+                dir_inode_with_free_entry = cur_dir_block;
+            }
             if (dir_inode->entries[i].inode > 0 && stringcmp(dir_inode->entries[i].name, filename) == 0) {
                 DEBUG("sfsdebug", "SFS sfs_create: File %s already exists!\n", filename);
                 lock_release(sfs->lock);
                 return VFS_ERROR;
             }
         } 
-        next_dir_inode = dir_inode->next_dir_inode;
+        cur_dir_block = dir_inode->next_dir_inode;
     }
 
-    DEBUG("sfsdebug", "SFS sfs_create: ok, creating file %s\n", filename);
+    // we haven't encountered a free dir entry yet, first check the whole chain
+    while (dir_inode_with_free_entry == 0) {
+        dir_inode = &(sfs->inode.node.dir);
+        for (i = 0; i < (int)SFS_ENTRIES_PER_DIR; i++) {
+            if (dir_inode->entries[i].inode == 0) {
+                dir_inode_with_free_entry = cur_dir_block;
+                break;
+            }
+        } 
+        if (dir_inode_with_free_entry != 0) { // already found
+            break;
+        }
+        // follow the chained directories
+        if (dir_inode->next_dir_inode == 0) {
+            DEBUG("sfsdebug", "SFS sfs_create: creating new dir entry since others are full\n");
+            // end of chain, need to reserve a new dir block
+            dir_inode_with_free_entry = sfs_get_free_block(sfs);
+            if (dir_inode_with_free_entry == 0) {
+                DEBUG("sfsdebug", "SFS sfs_create: failed, disk full\n");
+                lock_release(sfs->lock);
+                return VFS_ERROR;
+            }
+            dir_inode->next_dir_inode = dir_inode_with_free_entry;
+            DEBUG("sfsdebug", "  -> new dir at block %d, updating block %d\n", dir_inode_with_free_entry, cur_dir_block);
+            sfs_write_block(sfs, cur_dir_block, &(sfs->inode.buffer));
+            memoryset(&(sfs->inode.buffer), 0, SFS_BLOCK_SIZE);
+            sfs->inode.node.inode_type = SFS_DIR_INODE;
+            sfs_write_block(sfs, dir_inode_with_free_entry, &(sfs->inode.buffer));
+            break;
+        } else {
+            // go to the next dir inode
+            cur_dir_block = dir_inode->next_dir_inode;
+
+            r = sfs_read_block(sfs, cur_dir_block, &(sfs->inode.buffer));
+            if (r == 0) {
+                lock_release(sfs->lock);
+                return VFS_ERROR;
+            }
+            if (sfs->inode.node.inode_type != SFS_DIR_INODE) {
+                kprintf("SFS: inode should be dir but isn't! inode %d\n", cur_dir_block);
+                KERNEL_PANIC("SFS: corrupted filesystem!\n");
+            }
+        }
+    }
+
+    DEBUG("sfsdebug", "SFS sfs_create: ok, creating file %s, dir %d\n", filename, dir_inode_with_free_entry);
+
+    // reserve & populate blocks for the file
+    // if any of the sfs_get_free_blocks fails, free all the already reserved blocks
+
+    KERNEL_ASSERT(size == 0);
 
     uint32_t file_block = sfs_get_free_block(sfs);
     if (file_block == 0) {
@@ -326,8 +384,40 @@ int sfs_create(fs_t *fs, char *filename, int size)
         lock_release(sfs->lock);
         return VFS_ERROR;
     }
+    memoryset(&(sfs->inode.buffer), 0, SFS_BLOCK_SIZE);
+    sfs->inode.node.inode_type = SFS_FILE_INODE; 
+    sfs->inode.node.file.filesize = size;
 
-    lock_release(sfs->lock);
+    // reserve enough space for the file
+
+    sfs_write_block(sfs, file_block, &(sfs->inode.buffer));
+
+    // required blocks for the file have been reserved, now add it to the directory inode
+     
+    r = sfs_read_block(sfs, dir_inode_with_free_entry, &(sfs->inode.buffer));
+    if (r == 0) {
+        lock_release(sfs->lock);
+        return VFS_ERROR;
+    }
+    if (sfs->inode.node.inode_type != SFS_DIR_INODE) {
+        kprintf("SFS: inode should be dir but isn't! inode %d\n", dir_inode_with_free_entry);
+        KERNEL_PANIC("SFS: corrupted filesystem!\n");
+    }
+    dir_inode = &(sfs->inode.node.dir);
+    for (i = 0; i < (int)SFS_ENTRIES_PER_DIR; i++) {
+        if (dir_inode->entries[i].inode == 0) {
+            dir_inode->entries[i].inode = file_block; 
+            stringcopy(dir_inode->entries[i].name, filename, SFS_FILENAME_MAX);
+            r = sfs_write_block(sfs, dir_inode_with_free_entry, &(sfs->inode.buffer));
+            lock_release(sfs->lock);
+            if (r == 0) {
+                return VFS_ERROR;
+            } else {
+                return VFS_OK;
+            }
+        }
+    }
+    KERNEL_PANIC("SFS: could not empty directory entry even though that should be guaranteed!\n");
     return VFS_ERROR;
 }
 
