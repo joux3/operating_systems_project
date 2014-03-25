@@ -46,6 +46,15 @@ typedef struct {
 
 #define SFS_BLOCKS_PER_BAB (SFS_BLOCK_SIZE * 8)
 
+int sfs_read_block(sfs_t *sfs, uint32_t block, void *buffer) {
+    gbd_request_t req;
+
+    req.block = block;
+    req.sem = NULL;
+    req.buf = ADDR_KERNEL_TO_PHYS((uint32_t)buffer);
+    return sfs->disk->read_block(sfs->disk, &req);
+}
+
 int sfs_is_block_free(sfs_t *sfs, uint32_t block) {
     gbd_request_t req;
     int r, offset_in_bab;
@@ -68,15 +77,6 @@ int sfs_is_block_free(sfs_t *sfs, uint32_t block) {
 
 uint32_t sfs_root_inode(sfs_t *sfs) {
     return 1 + sfs->bab_count; 
-}
-
-int sfs_read_block(sfs_t *sfs, uint32_t block, void *buffer) {
-    gbd_request_t req;
-
-    req.block = block;
-    req.sem = NULL;
-    req.buf = ADDR_KERNEL_TO_PHYS((uint32_t)buffer);
-    return sfs->disk->read_block(sfs->disk, &req);
 }
 
 /** 
@@ -264,7 +264,6 @@ int sfs_close(fs_t *fs, int fileid)
 int sfs_create(fs_t *fs, char *filename, int size) 
 {
     sfs_t *sfs = (sfs_t*)fs->internal;
-    gbd_request_t req;
     int r, i;
     uint32_t next_dir_inode;
     sfs_inode_dir_t *dir_inode;
@@ -278,10 +277,7 @@ int sfs_create(fs_t *fs, char *filename, int size)
     // check if the file exists or not
     next_dir_inode = sfs_root_inode(sfs); 
     while (next_dir_inode != 0) {
-        req.block = next_dir_inode;
-        req.sem = NULL;
-        req.buf = ADDR_KERNEL_TO_PHYS((uint32_t)sfs->inode.buffer);
-        r = sfs->disk->read_block(sfs->disk, &req);
+        r = sfs_read_block(sfs, next_dir_inode, &(sfs->inode.buffer));
         if (r == 0) {
             lock_release(sfs->lock);
             return VFS_ERROR;
@@ -293,7 +289,7 @@ int sfs_create(fs_t *fs, char *filename, int size)
         dir_inode = &(sfs->inode.node.dir);
         for (i = 0; i < (int)SFS_ENTRIES_PER_DIR; i++) {
             if (dir_inode->entries[i].inode > 0 && stringcmp(dir_inode->entries[i].name, filename) == 0) {
-                DEBUG("sfsdebug", "SFS sfs_create: File %s already exists!", filename);
+                DEBUG("sfsdebug", "SFS sfs_create: File %s already exists!\n", filename);
                 lock_release(sfs->lock);
                 return VFS_ERROR;
             }
@@ -302,6 +298,7 @@ int sfs_create(fs_t *fs, char *filename, int size)
     }
 
     lock_release(sfs->lock);
+    DEBUG("sfsdebug", "SFS sfs_create: ok, creating file %s\n", filename);
 
     return VFS_ERROR;
 }
