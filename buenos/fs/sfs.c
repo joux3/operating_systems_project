@@ -56,7 +56,6 @@ int sfs_read_block(sfs_t *sfs, uint32_t block, void *buffer) {
 }
 
 int sfs_is_block_free(sfs_t *sfs, uint32_t block) {
-    gbd_request_t req;
     int r, offset_in_bab;
     uint32_t bab_block;
     
@@ -64,14 +63,13 @@ int sfs_is_block_free(sfs_t *sfs, uint32_t block) {
     bab_block = block / SFS_BLOCKS_PER_BAB;
     KERNEL_ASSERT(bab_block < sfs->bab_count);
     
-    req.block = bab_block + 1; // first block is the magic block
-    req.sem = NULL;
-    req.buf = ADDR_KERNEL_TO_PHYS((uint32_t)&(sfs->bab.buffer));
-    r = sfs->disk->read_block(sfs->disk, &req);
+    // on disk the first block is magic block
+    r = sfs_read_block(sfs, bab_block + 1, &(sfs->bab.buffer)); 
     KERNEL_ASSERT(r != 0);
 
     offset_in_bab = block - bab_block * SFS_BLOCKS_PER_BAB;
 
+    kprintf("offset %d, block %d, bab_block %d\n", offset_in_bab, block, bab_block);
     return bitmap_get(&(sfs->bab.bitmap), offset_in_bab);
 }
 
@@ -162,10 +160,7 @@ fs_t * sfs_init(gbd_t *disk)
         return NULL;
     }
     // - check that the root inode is a directory
-    req.block = sfs_root_inode(sfs);
-    req.sem = NULL;
-    req.buf = ADDR_KERNEL_TO_PHYS((uint32_t)&buffer);
-    r = disk->read_block(disk, &req);
+    r = sfs_read_block(sfs, sfs_root_inode(sfs), &buffer);
     if (r == 0 || ((sfs_inode_t*)buffer)->inode_type != SFS_DIR_INODE) {
         lock_destroy(lock);
         pagepool_free_phys_page(ADDR_KERNEL_TO_PHYS(addr));
