@@ -8,6 +8,7 @@
 #include "fs/sfs.h"
 #include "lib/libc.h"
 #include "lib/bitmap.h"
+#include "lib/debug.h"
 
 
 /* Data structure used internally by SFS filesystem. This data structure 
@@ -30,8 +31,32 @@ typedef struct {
     uint32_t bab_count;
 
     uint32_t block_count;
+
+    // allocate here to save stack space
+    char bab_buffer[SFS_BLOCK_SIZE];
 } sfs_t;
 
+#define SFS_BLOCKS_PER_BAB (SFS_BLOCK_SIZE * 8)
+
+int sfs_is_block_free(sfs_t *sfs, uint32_t block) {
+    gbd_request_t req;
+    int r, offset_in_bab;
+    uint32_t bab_block;
+    
+    KERNEL_ASSERT(block < sfs->block_count);
+    bab_block = block / SFS_BLOCKS_PER_BAB;
+    KERNEL_ASSERT(bab_block < sfs->bab_count);
+    
+    req.block = bab_block + 1; // first block is the magic block
+    req.sem = NULL;
+    req.buf = ADDR_KERNEL_TO_PHYS((uint32_t)&(sfs->bab_buffer));
+    r = sfs->disk->read_block(sfs->disk, &req);
+    KERNEL_ASSERT(r != 0);
+
+    offset_in_bab = block - bab_block * SFS_BLOCKS_PER_BAB;
+
+    return bitmap_get((bitmap_t*)sfs->bab_buffer, offset_in_bab);
+}
 
 /** 
  * Initialize trivial filesystem. Allocates 1 page of memory dynamically for
@@ -94,6 +119,7 @@ fs_t * sfs_init(gbd_t *disk)
         return NULL;
     }
 
+
     stringcopy(name, (((char*)buffer) + 4), SFS_VOLUMENAME_MAX);
     fs = (fs_t*)addr;
     sfs = (sfs_t*)(addr + sizeof(fs_t));
@@ -103,6 +129,28 @@ fs_t * sfs_init(gbd_t *disk)
     sfs->block_count = disk->total_blocks(disk);
     sfs->bab_count = ((sfs->block_count - 1) + 1024)/1025;
     sfs->root_inode = sfs->bab_count + 1;
+
+    DEBUG("sfsdebug", "SFS: Found %d BABs, %d total blocks\n", sfs->bab_count, sfs->block_count);
+
+    // do some quick sanity checks:
+    // - check that the first block is always marked as used (as it's reserved for root inode)
+    if (sfs_is_block_free(sfs, 0) != 0) {
+        lock_destroy(lock);
+        pagepool_free_phys_page(ADDR_KERNEL_TO_PHYS(addr));
+        kprintf("sfs_init: Sanity check: root dir node marked free!? Initialization failed.\n");
+        return NULL;
+    }
+    // - check that the root inode is a directory
+    req.block = 1 + sfs->bab_count;
+    req.sem = NULL;
+    req.buf = ADDR_KERNEL_TO_PHYS((uint32_t)&buffer);
+    r = disk->read_block(disk, &req);
+    if (r == 0 || ((sfs_inode_t*)buffer)->inode_type != SFS_DIR_INODE) {
+        lock_destroy(lock);
+        pagepool_free_phys_page(ADDR_KERNEL_TO_PHYS(addr));
+        kprintf("sfs_init: Sanity check: root dir inode not marked as dir! Initialization failed.\n");
+        return NULL;
+    }
 
     fs->internal = (void*)sfs; 
     stringcopy(fs->volume_name, name, VFS_NAME_LENGTH);
