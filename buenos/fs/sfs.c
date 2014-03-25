@@ -294,7 +294,7 @@ int sfs_create(fs_t *fs, char *filename, int size)
     sfs_inode_dir_t *dir_inode;
     dir_inode_with_free_entry = 0;
      
-    if ((uint32_t)size > SFS_MAX_FILESIZE) {
+    if ((uint32_t)size > SFS_MAX_FILESIZE || size < 0) {
         return VFS_ERROR;
     }
 
@@ -302,7 +302,7 @@ int sfs_create(fs_t *fs, char *filename, int size)
 
     // check if the file exists or not
     cur_dir_block = sfs_root_inode(sfs); 
-    while (cur_dir_block != 0) {
+    while (1) {
         r = sfs_read_block(sfs, cur_dir_block, &(sfs->inode.buffer));
         if (r == 0) {
             lock_release(sfs->lock);
@@ -323,10 +323,15 @@ int sfs_create(fs_t *fs, char *filename, int size)
                 return VFS_ERROR;
             }
         } 
-        cur_dir_block = dir_inode->next_dir_inode;
+        if (dir_inode->next_dir_inode == 0) {
+            break;
+        } else {
+            cur_dir_block = dir_inode->next_dir_inode;
+        }
     }
 
     // we haven't encountered a free dir entry yet, first check the whole chain
+    DEBUG("sfsdebug", "dir block with free entry %d\n", dir_inode_with_free_entry);
     while (dir_inode_with_free_entry == 0) {
         dir_inode = &(sfs->inode.node.dir);
         for (i = 0; i < (int)SFS_ENTRIES_PER_DIR; i++) {
