@@ -46,6 +46,8 @@ typedef struct {
     uint32_t indirect1[SFS_BLOCK_SIZE / sizeof(uint32_t)];
     uint32_t indirect2[SFS_BLOCK_SIZE / sizeof(uint32_t)];
     uint32_t indirect3[SFS_BLOCK_SIZE / sizeof(uint32_t)];
+    // some raw data
+    char rawbuffer[SFS_BLOCK_SIZE];
 } sfs_t;
 
 #define SFS_BLOCKS_PER_BAB (SFS_BLOCK_SIZE * 8)
@@ -381,8 +383,6 @@ int sfs_create(fs_t *fs, char *filename, int size)
     // reserve & populate blocks for the file
     // if any of the sfs_get_free_blocks fails, free all the already reserved blocks
 
-    KERNEL_ASSERT(size == 0);
-
     uint32_t file_block = sfs_get_free_block(sfs);
     if (file_block == 0) {
         DEBUG("sfsdebug", "SFS sfs_create: failed, disk full\n");
@@ -394,6 +394,24 @@ int sfs_create(fs_t *fs, char *filename, int size)
     sfs->inode.node.file.filesize = size;
 
     // reserve enough space for the file
+
+    uint32_t size_left = (uint32_t)size;
+
+    memoryset(&(sfs->rawbuffer), 0, SFS_BLOCK_SIZE);
+
+    // direct blocks
+    for (i = 0; (uint32_t)i < SFS_DIRECT_DATA_BLOCKS && size_left > 0; i++) {
+        uint32_t direct_block = sfs_get_free_block(sfs);
+        DEBUG("sfsdebug", "reserving block %d for direct file data\n", direct_block);
+        KERNEL_ASSERT(direct_block != 0); // TODO: error handling
+        sfs_write_block(sfs, direct_block, &(sfs->rawbuffer));
+        size_left -= MIN(size_left, SFS_BLOCK_SIZE);
+        sfs->inode.node.file.direct_blocks[i] = direct_block;
+    }
+
+    // first indirect blocks
+
+    KERNEL_ASSERT(size_left == 0);
 
     sfs_write_block(sfs, file_block, &(sfs->inode.buffer));
 
