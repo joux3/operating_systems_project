@@ -229,6 +229,25 @@ void itoa(int num, char *buf) {
     *buf = '\0';
 }
 
+int myisdigit(const char c) {
+    return c >= '0' && c <= '9';
+}
+
+int atoi( const char *c ) {
+    int value = 0;
+    int sign = 1;
+    if( *c == '+' || *c == '-' ) {
+       if( *c == '-' ) sign = -1;
+       c++;
+    }
+    while ( myisdigit( *c ) ) {
+        value *= 10;
+        value += (int) (*c-'0');
+        c++;
+    }
+    return value * sign;
+}
+
 /**
  * Compares two strings. The strings must be null-terminated. If the
  * strings are equal returns 0. If the first string is greater than
