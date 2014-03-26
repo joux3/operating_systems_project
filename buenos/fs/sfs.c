@@ -275,6 +275,22 @@ int sfs_close(fs_t *fs, int fileid)
 }
 
 
+// reserves direct blocks to pointers
+// returns the size_left after reserving
+uint32_t sfs_reserve_direct_blocks(sfs_t *sfs, uint32_t size_left, uint32_t *pointers, uint32_t max_blocks) {
+    uint32_t i;
+    memoryset(&(sfs->rawbuffer), 0, SFS_BLOCK_SIZE);
+    for (i = 0; i < max_blocks && size_left > 0; i++) {
+        uint32_t direct_block = sfs_get_free_block(sfs);
+        DEBUG("sfsdebug", "reserving block %d for direct file data\n", direct_block);
+        KERNEL_ASSERT(direct_block != 0); // TODO: error handling
+        sfs_write_block(sfs, direct_block, &(sfs->rawbuffer));
+        size_left -= MIN(size_left, SFS_BLOCK_SIZE);
+        pointers[i] = direct_block;
+    }
+    return size_left;
+}
+
 /**
  * Creates file of given size. Implements fs.create(). Checks that
  * file name doesn't allready exist in directory block.Allocates
@@ -393,23 +409,14 @@ int sfs_create(fs_t *fs, char *filename, int size)
     sfs->inode.node.inode_type = SFS_FILE_INODE; 
     sfs->inode.node.file.filesize = size;
 
-    // reserve enough space for the file
+    // reserve enough space for the file:
 
     uint32_t size_left = (uint32_t)size;
 
-    memoryset(&(sfs->rawbuffer), 0, SFS_BLOCK_SIZE);
+    // - direct blocks
+    size_left = sfs_reserve_direct_blocks(sfs, size_left, (uint32_t*)&(sfs->inode.node.file.direct_blocks), SFS_DIRECT_DATA_BLOCKS);
 
-    // direct blocks
-    for (i = 0; (uint32_t)i < SFS_DIRECT_DATA_BLOCKS && size_left > 0; i++) {
-        uint32_t direct_block = sfs_get_free_block(sfs);
-        DEBUG("sfsdebug", "reserving block %d for direct file data\n", direct_block);
-        KERNEL_ASSERT(direct_block != 0); // TODO: error handling
-        sfs_write_block(sfs, direct_block, &(sfs->rawbuffer));
-        size_left -= MIN(size_left, SFS_BLOCK_SIZE);
-        sfs->inode.node.file.direct_blocks[i] = direct_block;
-    }
-
-    // first indirect blocks
+    // - first indirect blocks
 
     KERNEL_ASSERT(size_left == 0);
 
@@ -440,7 +447,7 @@ int sfs_create(fs_t *fs, char *filename, int size)
             }
         }
     }
-    KERNEL_PANIC("SFS: could not empty directory entry even though that should be guaranteed!\n");
+    KERNEL_PANIC("SFS: could not find empty directory entry even though that should be guaranteed!\n");
     return VFS_ERROR;
 }
 
