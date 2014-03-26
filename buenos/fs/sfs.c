@@ -307,6 +307,20 @@ uint32_t sfs_reserve_indirect1_blocks(sfs_t *sfs, uint32_t size_left, uint32_t *
     return size_left;
 }
 
+uint32_t sfs_reserve_indirect2_blocks(sfs_t *sfs, uint32_t size_left, uint32_t *pointers, uint32_t max_blocks) {
+    uint32_t i;
+    memoryset(&(sfs->indirect2), 0, SFS_BLOCK_SIZE);
+    for (i = 0; i < max_blocks && size_left > 0; i++) {
+        uint32_t indirect2_block = sfs_get_free_block(sfs);
+        DEBUG("sfsdebug", "reserving block %d for indirect2 pointer data\n", indirect2_block);
+        KERNEL_ASSERT(indirect2_block != 0); // TODO: error handling
+        size_left = sfs_reserve_indirect1_blocks(sfs, size_left, (uint32_t*)&(sfs->indirect2), SFS_INDIRECT_POINTERS); 
+        KERNEL_ASSERT(sfs_write_block(sfs, indirect2_block, &(sfs->indirect2)) != 0);
+        pointers[i] = indirect2_block;
+    }
+    return size_left;
+}
+
 /**
  * Creates file of given size. Implements fs.create(). Checks that
  * file name doesn't allready exist in directory block.Allocates
@@ -433,9 +447,11 @@ int sfs_create(fs_t *fs, char *filename, int size)
     size_left = sfs_reserve_direct_blocks(sfs, size_left, (uint32_t*)&(sfs->inode.node.file.direct_blocks), SFS_DIRECT_DATA_BLOCKS);
 
     // - first indirect blocks
-    if (size_left > 0) {
+    if (size_left > 0)
         size_left = sfs_reserve_indirect1_blocks(sfs, size_left, &(sfs->inode.node.file.first_indirect), 1);
-    }
+    // - second indirect blocks
+    if (size_left > 0)
+        size_left = sfs_reserve_indirect2_blocks(sfs, size_left, &(sfs->inode.node.file.second_indirect), 1);
 
     KERNEL_ASSERT(size_left == 0);
 
