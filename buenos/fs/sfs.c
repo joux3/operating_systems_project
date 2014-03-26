@@ -417,6 +417,14 @@ int sfs_create(fs_t *fs, char *filename, int size)
     size_left = sfs_reserve_direct_blocks(sfs, size_left, (uint32_t*)&(sfs->inode.node.file.direct_blocks), SFS_DIRECT_DATA_BLOCKS);
 
     // - first indirect blocks
+    if (size_left > 0) {
+        uint32_t indirect1_block = sfs_get_free_block(sfs);
+        DEBUG("sfsdebug", "reserving block %d for first indirect data\n", indirect1_block);
+        KERNEL_ASSERT(indirect1_block != 0); // TODO: error handling
+        memoryset(&(sfs->indirect1), 0, SFS_BLOCK_SIZE);
+        sfs->inode.node.file.first_indirect = indirect1_block;
+        size_left = sfs_reserve_direct_blocks(sfs, size_left, (uint32_t*)&(sfs->indirect1), SFS_INDIRECT_POINTERS);
+    }
 
     KERNEL_ASSERT(size_left == 0);
 
