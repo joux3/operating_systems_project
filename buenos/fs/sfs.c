@@ -284,9 +284,25 @@ uint32_t sfs_reserve_direct_blocks(sfs_t *sfs, uint32_t size_left, uint32_t *poi
         uint32_t direct_block = sfs_get_free_block(sfs);
         DEBUG("sfsdebug", "reserving block %d for direct file data\n", direct_block);
         KERNEL_ASSERT(direct_block != 0); // TODO: error handling
-        sfs_write_block(sfs, direct_block, &(sfs->rawbuffer));
+        // empty out the new file data block
+        KERNEL_ASSERT(sfs_write_block(sfs, direct_block, &(sfs->rawbuffer)) != 0);
         size_left -= MIN(size_left, SFS_BLOCK_SIZE);
         pointers[i] = direct_block;
+    }
+    return size_left;
+}
+
+uint32_t sfs_reserve_indirect1_blocks(sfs_t *sfs, uint32_t size_left, uint32_t *pointers, uint32_t max_blocks) {
+    uint32_t i;
+    memoryset(&(sfs->indirect1), 0, SFS_BLOCK_SIZE);
+    for (i = 0; i < max_blocks && size_left > 0; i++) {
+        uint32_t indirect1_block = sfs_get_free_block(sfs);
+        DEBUG("sfsdebug", "reserving block %d for indirect1 pointer data\n", indirect1_block);
+        KERNEL_ASSERT(indirect1_block != 0); // TODO: error handling
+        size_left = sfs_reserve_direct_blocks(sfs, size_left, (uint32_t*)&(sfs->indirect1), SFS_INDIRECT_POINTERS); 
+        KERNEL_ASSERT(sfs_write_block(sfs, indirect1_block, &(sfs->indirect1)) != 0);
+        pointers[i] = indirect1_block;
+        
     }
     return size_left;
 }
@@ -418,12 +434,7 @@ int sfs_create(fs_t *fs, char *filename, int size)
 
     // - first indirect blocks
     if (size_left > 0) {
-        uint32_t indirect1_block = sfs_get_free_block(sfs);
-        DEBUG("sfsdebug", "reserving block %d for first indirect data\n", indirect1_block);
-        KERNEL_ASSERT(indirect1_block != 0); // TODO: error handling
-        memoryset(&(sfs->indirect1), 0, SFS_BLOCK_SIZE);
-        sfs->inode.node.file.first_indirect = indirect1_block;
-        size_left = sfs_reserve_direct_blocks(sfs, size_left, (uint32_t*)&(sfs->indirect1), SFS_INDIRECT_POINTERS);
+        size_left = sfs_reserve_indirect1_blocks(sfs, size_left, &(sfs->inode.node.file.first_indirect), 1);
     }
 
     KERNEL_ASSERT(size_left == 0);
