@@ -770,19 +770,49 @@ int sfs_write(fs_t *fs, int fileid, void *buffer, int datasize, int offset)
     uint32_t *indirect1 = (uint32_t*)(addr + sizeof(sfs_inode_t));
     uint32_t *indirect2 = (uint32_t*)(addr + sizeof(sfs_inode_t) + 1 * SFS_BLOCK_SIZE);
     uint32_t *indirect3 = (uint32_t*)(addr + sizeof(sfs_inode_t) + 2 * SFS_BLOCK_SIZE);
+    char *raw_buffer    = (char*)(addr + sizeof(sfs_inode_t) + 3 * SFS_BLOCK_SIZE);
+    int written = 0;
+    // TODO REMOVE
+    indirect1 = indirect1;
+    indirect2 = indirect2;
+    indirect3 = indirect3;
 
-    if (sfs_read_block(sfs, fileid, inode) == 0) {
+    if (sfs_read_block(sfs, fileid, inode) == 0)
         goto error; 
-    }
+    if (offset < 0 || offset > (int)inode->file.filesize) 
+        goto error;
     
     datasize = MIN(datasize, (int)inode->file.filesize - offset);
     if (datasize == 0) 
         goto success;
+
+    KERNEL_ASSERT(offset + datasize <= (int)SFS_DIRECT_SIZE); // Todo, only supports direct blocks now
+    if (offset <= (int)SFS_DIRECT_SIZE) {
+        int block;
+        for (block = 0; block < (int)SFS_DIRECT_DATA_BLOCKS && datasize > 0; block++) {
+            if (offset >= block * (int)SFS_BLOCK_SIZE && offset < (block + 1) * (int)SFS_BLOCK_SIZE) {
+                // write touches this block
+                if (!(offset == block * (int)SFS_BLOCK_SIZE && datasize >= SFS_BLOCK_SIZE)) {
+                    // we're not fully overwriting the block; read it first
+                    DEBUG("sfsdebug", "Reading block %d before overwriting parts\n", inode->file.direct_blocks[block]);
+                    if (sfs_read_block(sfs, inode->file.direct_blocks[block], raw_buffer) == 0) 
+                        goto error;
+                }
+                // copy to the buffer
+                int in_this_block = MIN(SFS_BLOCK_SIZE - (offset % SFS_BLOCK_SIZE), datasize);
+                memcopy(in_this_block, raw_buffer + (offset % SFS_BLOCK_SIZE), buffer); 
+                if (sfs_write_block(sfs, inode->file.direct_blocks[block], raw_buffer) == 0) 
+                    goto error;
+                written += in_this_block;
+                datasize -= in_this_block;
+                offset += in_this_block;
+            }
+        }
+    }
+    KERNEL_ASSERT(datasize == 0);
     
-    fileid = fileid;
     buffer = buffer;
-    datasize = datasize;
-    offset = offset;
+
 
 success:
     pagepool_free_phys_page(ADDR_KERNEL_TO_PHYS(addr));
