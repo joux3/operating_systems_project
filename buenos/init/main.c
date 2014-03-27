@@ -65,6 +65,10 @@
     #include "kernel_tests/priority_test.h"
 #endif
 
+#ifdef CHANGED_3
+    #include "kernel_tests/nic_test.h"
+#endif
+
 /**
  * Fallback function for system startup. This function is executed
  * if the initial startup program (shell or other userland process given
@@ -126,6 +130,12 @@ void init_startup_fallback(void) {
             priority_test_main();
         }
 
+    #endif
+
+    #ifdef CHANGED_3
+        if (bootargs_get("nic_test") != NULL) {
+            nic_test_main();
+        }
     #endif
 
     /* Nothing else to do, so we shut the system down. */
