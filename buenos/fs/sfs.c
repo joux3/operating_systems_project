@@ -491,6 +491,7 @@ int sfs_create(fs_t *fs, char *filename, int size)
         size_left = sfs_reserve_indirect2_blocks(sfs, size_left, &(sfs->inode.node.file.second_indirect), 1);
     if (size_left > 0) 
         size_left = sfs_reserve_indirect3_blocks(sfs, size_left, &(sfs->inode.node.file.third_indirect), 1);
+    DEBUG("sfsdebug", "SFS_create: block reservation done with size_left %d\n", size_left);
 
     // if any of the block reservations failed (i.e. disk got full), rollback the block reservations
     // by reading BABs from the disk again
