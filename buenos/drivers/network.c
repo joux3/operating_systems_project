@@ -11,6 +11,7 @@
 #include "drivers/yams.h"
 #include "drivers/gnd.h"
 #include "drivers/network.h"
+#include "lib/debug.h"
 
 static void nic_interrupt_handle(device_t *device);
 static int nic_send(gnd_t *gnd, void *frame, network_address_t addr);
@@ -19,6 +20,7 @@ static uint32_t nic_frame_size(gnd_t *gnd);
 static network_address_t nic_hwaddr(gnd_t *gnd);
 
 device_t *nic_init(io_descriptor_t *desc) {
+    DEBUG("nic_test", "In nic init!\n");
     device_t *dev;
     gnd_t *gnd;
     nic_real_device_t *real_dev;
@@ -50,25 +52,30 @@ device_t *nic_init(io_descriptor_t *desc) {
 
 
 static void nic_interrupt_handle(device_t *device) {
+    DEBUG("nic_test", "In nic send!\n");
     device = device;
 }
 
 static int nic_send(gnd_t *gnd, void *frame, network_address_t addr) {
+    DEBUG("nic_test", "In nic send!\n");
     gnd = gnd;
     frame = frame;
     addr = addr;
     return 0;
 }
 static int nic_recv(gnd_t *gnd, void *frame) {
+    DEBUG("nic_test", "In nic send!\n");
     gnd = gnd;
     frame = frame;
     return 0;
 }
 static uint32_t nic_frame_size(gnd_t *gnd) {
+    DEBUG("nic_test", "In nic send!\n");
     gnd = gnd;
     return 0;
 }
 static network_address_t nic_hwaddr(gnd_t *gnd) {
+    DEBUG("nic_test", "In nic send!\n");
     gnd = gnd;
     return 0;
 }
