@@ -27,6 +27,7 @@ int main(int argc, char **argv) {
     if (argc > 2) {
         filehandle = syscall_open(argv[1]);
         if (filehandle >= 0) {
+            prints("opened file\n");
             int i;
             for (i = 2; i < argc; i++) {
                 int written = 0;
@@ -35,7 +36,13 @@ int main(int argc, char **argv) {
                     syscall_write(filehandle, " ", 1);
                 }
                 while (written < len) {
-                    written += syscall_write(filehandle, (void*)(argv[i] + written), len - written);
+                    int wrote = syscall_write(filehandle, (void*)(argv[i] + written), len - written);
+                    written += wrote;
+                    if (wrote <= 0) {
+                        syscall_close(filehandle);
+                        prints("failed to write fully!\n");
+                        return 10;
+                    }
                 } 
             }
             syscall_close(filehandle);

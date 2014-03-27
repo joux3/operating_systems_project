@@ -25,8 +25,6 @@ typedef struct {
     // lock for mutual exclusion of fs-operations
     lock_t    *lock;
 
-    uint32_t root_inode;
-
     // block allocation block count
     uint32_t bab_count;
     uint32_t block_count;
@@ -96,7 +94,13 @@ int sfs_write_bab_cache(sfs_t *sfs) {
 }
 
 int sfs_is_block_free(sfs_t *sfs, uint32_t block) {
+    KERNEL_ASSERT(block < sfs->data_block_count);
     return bitmap_get(sfs->bab_cache.bitmap, block) == 0;
+}
+
+void sfs_free_block(sfs_t *sfs, uint32_t block) {
+    KERNEL_ASSERT(block < sfs->data_block_count);
+    bitmap_set(sfs->bab_cache.bitmap, block, 0);
 }
 
 // finds a free block and marks it as used
@@ -184,7 +188,6 @@ fs_t * sfs_init(gbd_t *disk)
     sfs->block_count = disk->total_blocks(disk);
     sfs->bab_count = ((sfs->block_count - 1) + 1024)/1025;
     sfs->data_block_count = sfs->block_count - sfs->bab_count - 1;
-    sfs->root_inode = sfs->bab_count + 1;
 
     KERNEL_ASSERT(PAGE_SIZE >= sizeof(sfs_t) + sizeof(fs_t) + sfs->bab_count * SFS_BLOCK_SIZE);
 
@@ -253,6 +256,38 @@ int sfs_unmount(fs_t *fs)
     return VFS_OK;
 }
 
+// returns:
+// - the file inode block number if found
+// - 0 if not found
+uint32_t sfs_find_file(sfs_t *sfs, char *filename) 
+{
+    int r;
+    uint32_t cur_dir_block, i;
+    sfs_inode_dir_t *dir_inode;
+    cur_dir_block = sfs_root_inode(sfs); 
+    while (1) {
+        r = sfs_read_block(sfs, cur_dir_block, &(sfs->inode.buffer));
+        if (r == 0) {
+            return 0;
+        }
+        if (sfs->inode.node.inode_type != SFS_DIR_INODE) {
+            kprintf("SFS: inode should be dir but isn't! inode %d\n", cur_dir_block);
+            KERNEL_PANIC("SFS: corrupted filesystem!\n");
+        }
+        dir_inode = &(sfs->inode.node.dir);
+        for (i = 0; i < SFS_ENTRIES_PER_DIR; i++) {
+            if (dir_inode->entries[i].inode > 0 && stringcmp(dir_inode->entries[i].name, filename) == 0) {
+                return dir_inode->entries[i].inode;
+            }
+        } 
+        if (dir_inode->next_dir_inode == 0) {
+            return 0;
+        } else {
+            cur_dir_block = dir_inode->next_dir_inode;
+        }
+    }
+}
+
 
 /**
  * Opens file. Implements fs.open(). Reads directory block of sfs
@@ -267,15 +302,22 @@ int sfs_unmount(fs_t *fs)
  */
 int sfs_open(fs_t *fs, char *filename)
 {
-    fs = fs;
-    filename = filename;
-    return VFS_ERROR;
+    sfs_t *sfs = fs->internal;
+    lock_acquire(sfs->lock);
+    // TODO: create the required data structures for concurrent read/write
+    uint32_t file_inode = sfs_find_file(sfs, filename);
+    lock_release(sfs->lock);
+    DEBUG("sfsdebug", "SFS_open: file block %d, name %s\n", file_inode, filename);
+    if (file_inode == 0) {
+        return VFS_ERROR;
+    } else {
+        return file_inode;
+    }
 }
 
 
 /**
- * Closes file. Implements fs.close(). There is nothing to be done, no
- * data strucutures or similar are reserved for file. Returns VFS_OK.
+ * Closes file. Implements fs.close()
  *
  * @param fs Pointer to fs data structure of the device.
  * @param fileid File id (inode block number) of the file.
@@ -284,6 +326,7 @@ int sfs_open(fs_t *fs, char *filename)
  */
 int sfs_close(fs_t *fs, int fileid)
 {
+    // TODO: free the required data structures for concurrent read/write
     fs = fs;
     fileid = fileid;
     return VFS_ERROR;
@@ -547,6 +590,7 @@ int sfs_create(fs_t *fs, char *filename, int size)
 
 /**
  * Removes given file. Implements fs.remove(). Frees blocks allocated
+    KERNEL_ASSERT(block < sfs->data_block_count);
  * for the file and directory entry.
  *
  * @param fs Pointer to fs data structure of the device.
