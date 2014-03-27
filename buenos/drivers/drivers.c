@@ -53,6 +53,8 @@ drivers_available_t drivers_available[] = {
     {YAMS_TYPECODE_SHUTDOWN, "System shutdown", &shutdown_init} ,
     {YAMS_TYPECODE_CPUSTATUS, "CPU status", &cpustatus_init} ,
     {YAMS_TYPECODE_DISK, "Disk", &disk_init},
+    #ifdef CHANGED_3
     {YAMS_TYPECODE_NIC, "NIC", &nic_init},
+    #endif
     {0, NULL, NULL}
 };
