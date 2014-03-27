@@ -94,13 +94,14 @@ int sfs_write_bab_cache(sfs_t *sfs) {
 }
 
 int sfs_is_block_free(sfs_t *sfs, uint32_t block) {
-    KERNEL_ASSERT(block < sfs->data_block_count);
-    return bitmap_get(sfs->bab_cache.bitmap, block) == 0;
+    KERNEL_ASSERT((block > sfs->bab_count) && (block + sfs->bab_count < sfs->block_count));
+    return bitmap_get(sfs->bab_cache.bitmap, block - sfs->bab_count - 1) == 0;
 }
 
 void sfs_free_block(sfs_t *sfs, uint32_t block) {
-    KERNEL_ASSERT(block < sfs->data_block_count);
-    bitmap_set(sfs->bab_cache.bitmap, block, 0);
+    DEBUG("sfsdebug", "SFS freeing diskblock %d, data block %d\n", block, block - sfs->bab_count - 1);
+    KERNEL_ASSERT((block > sfs->bab_count) && (block + sfs->bab_count < sfs->block_count));
+    bitmap_set(sfs->bab_cache.bitmap, block - sfs->bab_count - 1, 0);
 }
 
 // finds a free block and marks it as used
@@ -202,8 +203,8 @@ fs_t * sfs_init(gbd_t *disk)
     DEBUG("sfsdebug", "SFS: Found %d BABs, %d total blocks\n", sfs->bab_count, sfs->block_count);
 
     // do some quick sanity checks:
-    // - check that the first block is always marked as used (as it's reserved for root inode)
-    if (sfs_is_block_free(sfs, 0) != 0) {
+    // - check that the first data block is always marked as used (as it's reserved for root inode)
+    if (sfs_is_block_free(sfs, sfs_root_inode(sfs)) != 0) {
         lock_destroy(lock);
         pagepool_free_phys_page(ADDR_KERNEL_TO_PHYS(addr));
         kprintf("sfs_init: Sanity check: root dir node marked free!? Initialization failed.\n");
@@ -593,6 +594,25 @@ int sfs_create(fs_t *fs, char *filename, int size)
     return VFS_ERROR;
 }
 
+// frees all the data blocks & the file block itself
+// returns:
+// - 1 if no error
+// - 0 if error occured reading any of the file blocks
+int sfs_free_file_blocks(sfs_t *sfs, uint32_t file_block) 
+{
+    uint32_t i;
+    if (sfs_read_block(sfs, file_block, &(sfs->inode.buffer)) == 0) 
+        return 0;
+    sfs_free_block(sfs, file_block);
+    for (i = 0; i < SFS_DIRECT_DATA_BLOCKS; i++)
+        if (sfs->inode.node.file.direct_blocks[i] != 0)
+            sfs_free_block(sfs, sfs->inode.node.file.direct_blocks[i]);
+
+    // TODO free indirect data blocks
+
+    return 1;
+}
+
 /**
  * Removes given file. Implements fs.remove(). Frees blocks allocated
  * for the file and directory entry.
@@ -612,14 +632,12 @@ int sfs_remove(fs_t *fs, char *filename)
 
     uint32_t dir_block;
     uint32_t file_block = sfs_find_file_and_dir(sfs, filename, &dir_block);
-    if (file_block == 0) {
+    if (file_block == 0)
         goto error;
-    }
     
     // read the directory block free the entry with the given filename
-    if (sfs_read_block(sfs, dir_block, &(sfs->inode.buffer)) == 0) {
+    if (sfs_read_block(sfs, dir_block, &(sfs->inode.buffer)) == 0)
         goto error;
-    }
     for (i = 0; i < (int)SFS_ENTRIES_PER_DIR; i++) {
         if (stringcmp(sfs->inode.node.dir.entries[i].name, filename) == 0) {
             sfs->inode.node.dir.entries[i].inode = 0; 
@@ -628,11 +646,12 @@ int sfs_remove(fs_t *fs, char *filename)
             KERNEL_PANIC("SFS: sfs_find_file_and_dir inconsistency!\n");
         }
     }
-    if (sfs_write_block(sfs, dir_block, &(sfs->inode.buffer)) == 0) {
+    if (sfs_write_block(sfs, dir_block, &(sfs->inode.buffer)) == 0) 
         goto error;
-    }
-    // TODO: free the blocks associated with the file
+    if (sfs_free_file_blocks(sfs, file_block) == 0) 
+        goto error;
 
+    sfs_write_bab_cache(sfs);
     lock_release(sfs->lock);
     return VFS_OK;
 error:
