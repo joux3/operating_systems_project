@@ -44,7 +44,7 @@ typedef struct {
 typedef struct {
     spinlock_t slock;
     uint8_t send_sleepq;
-    uint8_t recv_sleepp;
+    uint8_t recv_sleepq;
     uint8_t recv_done_sleepq;
 } nic_real_device_t;
 

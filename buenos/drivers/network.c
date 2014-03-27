@@ -5,6 +5,7 @@
 #include "kernel/assert.h"
 #include "kernel/semaphore.h"
 #include "kernel/spinlock.h"
+#include "kernel/sleepq.h"
 #include "kernel/interrupt.h"
 #include "lib/libc.h"
 #include "drivers/device.h"
@@ -52,30 +53,72 @@ device_t *nic_init(io_descriptor_t *desc) {
 
 
 static void nic_interrupt_handle(device_t *device) {
-    DEBUG("nic_test", "In nic send!\n");
-    device = device;
+    
+    DEBUG("nic_test", "In nic interrupt handler!\n");
+    nic_real_device_t *real_dev = device->real_device;
+    nic_io_area_t *io = (nic_io_area_t*)device->io_address;
+    
+    spinlock_acquire(&real_dev->slock);
+    
+    if (NIC_STATUS_SIRQ(io->status)) {
+        io->command = NIC_COMMAND_CLEAR_SIRQ;
+        sleepq_wake(&real_dev->send_sleepq);
+    }
+    if (NIC_STATUS_RXIRQ(io->status)) {
+        sleepq_wake(&real_dev->recv_sleepq);
+    }
+    if(NIC_STATUS_RIRQ(io->status)) {
+        io->command = NIC_COMMAND_CLEAR_RIRQ;
+        io->command = NIC_COMMAND_CLEAR_RXBUSY;
+        sleepq_wake(&real_dev->recv_done_sleepq);
+    }
+    
+    spinlock_release(&real_dev->slock);
 }
 
 static int nic_send(gnd_t *gnd, void *frame, network_address_t addr) {
+    
+    addr = addr; // Address is no longer needed, since we copy from
+                 // buffer to buffer
+
     DEBUG("nic_test", "In nic send!\n");
-    gnd = gnd;
-    frame = frame;
-    addr = addr;
+    interrupt_status_t intr_status;
+    nic_real_device_t *real_dev = gnd->device->real_device;
+    nic_io_area_t *io = (nic_io_area_t*)gnd->device->io_address;
+
+    intr_status = _interrupt_disable();
+    spinlock_acquire(&real_dev->slock);
+
+    while (NIC_STATUS_SBUSY(io->status)) {
+        sleepq_add(&real_dev->recv_sleepq);
+        spinlock_release(&real_dev->slock);
+        thread_switch();
+        spinlock_acquire(&real_dev->slock);
+    }
+    
+    io->dmaaddr = *(uint32_t*)frame;
+    io->command = NIC_COMMAND_DMA_SEND;
+    if (NIC_STATUS_EBUSY(io->status) || NIC_STATUS_ERROR(io->status))
+        KERNEL_PANIC("Failed at NIC send");
+
+    spinlock_release(&real_dev->slock);
+    _interrupt_set_state(intr_status);
+    
     return 0;
 }
 static int nic_recv(gnd_t *gnd, void *frame) {
-    DEBUG("nic_test", "In nic send!\n");
+    DEBUG("nic_test", "In nic recv!\n");
     gnd = gnd;
     frame = frame;
     return 0;
 }
 static uint32_t nic_frame_size(gnd_t *gnd) {
-    DEBUG("nic_test", "In nic send!\n");
+    DEBUG("nic_test", "In nic frame_size!\n");
     gnd = gnd;
     return 0;
 }
 static network_address_t nic_hwaddr(gnd_t *gnd) {
-    DEBUG("nic_test", "In nic send!\n");
+    DEBUG("nic_test", "In nic hwaddr!\n");
     gnd = gnd;
     return 0;
 }
