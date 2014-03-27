@@ -595,7 +595,6 @@ int sfs_create(fs_t *fs, char *filename, int size)
 
 /**
  * Removes given file. Implements fs.remove(). Frees blocks allocated
-    KERNEL_ASSERT(block < sfs->data_block_count);
  * for the file and directory entry.
  *
  * @param fs Pointer to fs data structure of the device.
@@ -606,16 +605,37 @@ int sfs_create(fs_t *fs, char *filename, int size)
  */
 int sfs_remove(fs_t *fs, char *filename) 
 {
+    int i;
+
     sfs_t *sfs = fs->internal;
     lock_acquire(sfs->lock);
 
     uint32_t dir_block;
     uint32_t file_block = sfs_find_file_and_dir(sfs, filename, &dir_block);
     if (file_block == 0) {
-        lock_release(sfs->lock);
-        return VFS_ERROR;
+        goto error;
     }
+    
+    // read the directory block free the entry with the given filename
+    if (sfs_read_block(sfs, dir_block, &(sfs->inode.buffer)) == 0) {
+        goto error;
+    }
+    for (i = 0; i < (int)SFS_ENTRIES_PER_DIR; i++) {
+        if (stringcmp(sfs->inode.node.dir.entries[i].name, filename) == 0) {
+            sfs->inode.node.dir.entries[i].inode = 0; 
+            break;
+        } else if (i == SFS_ENTRIES_PER_DIR - 1) {
+            KERNEL_PANIC("SFS: sfs_find_file_and_dir inconsistency!\n");
+        }
+    }
+    if (sfs_write_block(sfs, dir_block, &(sfs->inode.buffer)) == 0) {
+        goto error;
+    }
+    // TODO: free the blocks associated with the file
 
+    lock_release(sfs->lock);
+    return VFS_OK;
+error:
     lock_release(sfs->lock);
     return VFS_ERROR;
 }
