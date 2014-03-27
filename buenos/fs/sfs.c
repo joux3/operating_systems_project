@@ -723,11 +723,58 @@ error:
  */ 
 int sfs_read(fs_t *fs, int fileid, void *buffer, int bufsize, int offset)
 {
-    fs = fs;
-    fileid = fileid;
+    sfs_t *sfs = fs->internal;
+    lock_acquire(sfs->lock);
+    // TODO: improve concurrency and remove full locking
+
+    // currently file id points to the file block, so validate it
+    if (fileid <= (int)sfs->bab_count || fileid >= (int)sfs->block_count) {
+        lock_release(sfs->lock);
+        return VFS_ERROR;
+    }
+
+    uint32_t addr = pagepool_get_phys_page();
+    if (addr == 0) {
+        lock_release(sfs->lock);
+        return VFS_ERROR;
+    }
+    addr = ADDR_PHYS_TO_KERNEL(addr);
+    sfs_inode_t *inode = (sfs_inode_t*)addr;
+    uint32_t *indirect1 = (uint32_t*)(addr + sizeof(sfs_inode_t));
+    uint32_t *indirect2 = (uint32_t*)(addr + sizeof(sfs_inode_t) + 1 * SFS_BLOCK_SIZE);
+    uint32_t *indirect3 = (uint32_t*)(addr + sizeof(sfs_inode_t) + 2 * SFS_BLOCK_SIZE);
+    char *raw_buffer    = (char*)(addr + sizeof(sfs_inode_t) + 3 * SFS_BLOCK_SIZE);
+    int read = 0;
+    // TODO REMOVE
+    indirect1 = indirect1;
+    indirect2 = indirect2;
+    indirect3 = indirect3;
+    raw_buffer = raw_buffer;
+
+    if (sfs_read_block(sfs, fileid, inode) == 0)
+        goto error; 
+    if (offset < 0 || offset > (int)inode->file.filesize) 
+        goto error;
+
+    bufsize = MIN(bufsize, (int)inode->file.filesize - offset);
+    if (bufsize == 0) {
+        goto success;
+    }
+
     buffer = buffer;
     bufsize = bufsize;
     offset = offset;
+
+    
+    KERNEL_ASSERT(bufsize == 0);
+
+success:
+    pagepool_free_phys_page(ADDR_KERNEL_TO_PHYS(addr));
+    lock_release(sfs->lock);
+    return read;
+error:
+    pagepool_free_phys_page(ADDR_KERNEL_TO_PHYS(addr));
+    lock_release(sfs->lock);
     return VFS_ERROR;
 }
 
@@ -813,8 +860,6 @@ int sfs_write(fs_t *fs, int fileid, void *buffer, int datasize, int offset)
     }
     KERNEL_ASSERT(datasize == 0);
     
-    buffer = buffer;
-
 success:
     pagepool_free_phys_page(ADDR_KERNEL_TO_PHYS(addr));
     lock_release(sfs->lock);
