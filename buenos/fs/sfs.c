@@ -797,7 +797,7 @@ error:
 int sfs_write_direct_blocks(sfs_t *sfs, void **buffer, char *raw_buffer, uint32_t *pointers, int pointer_count, int *datasize, int *offset) {
     int block, written = 0;
     for (block = 0; block < pointer_count && *datasize > 0; block++) {
-        if (*offset >= block * pointer_count && *offset < (block + 1) * pointer_count) {
+        if (*offset >= block * SFS_BLOCK_SIZE && *offset < (block + 1) * SFS_BLOCK_SIZE) {
             // write touches this block
             if (!(*offset == block * (int)SFS_BLOCK_SIZE && *datasize >= SFS_BLOCK_SIZE)) {
                 // we're not fully overwriting the block; read it first

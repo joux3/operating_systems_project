@@ -50,8 +50,26 @@ int main(int argc, char **argv) {
         }
         written += write;
     }
-    prints("OK, fstest wrote bytes\n");
-    
+    prints("OK, fstest wrote bytes. checking result\n");
+    syscall_seek(filehandle, 0);
+    int total_read = 0;
+    while(total_read < filesize) {
+        int i;
+        int read = MIN(filesize - total_read, blocksize);
+        read = syscall_read(filehandle, (void*)&buffer, read);
+        if (read <= 0) {
+            prints("failed to read!\n");
+            return 3;
+        }
+        for (i = 0; i < read; i++) {
+            if (buffer[i] != char_for_pos(total_read + i)) {
+                prints("READ CONTENTS DON'T MATCH THE WRITTEN CONTENTS! FS BUG!\n");
+                return 4;
+            }
+        }
+        total_read += read;
+    }
+    prints("read contents match the written contests!\n");
 
     return 0;
 }
