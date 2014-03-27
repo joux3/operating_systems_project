@@ -119,11 +119,6 @@ uint32_t sfs_root_inode(sfs_t *sfs) {
 }
 
 /** 
- * Initialize trivial filesystem. Allocates 1 page of memory dynamically for
- * filesystem data structure, sfs data structure and buffers needed.
- * Sets fs_t and sfs_t fields. If initialization is succesful, returns
- * pointer to fs_t data structure. Else NULL pointer is returned.
- *
  * @param Pointer to gbd-device performing sfs.
  *
  * @return Pointer to the filesystem data structure fs_t, if fails
@@ -594,19 +589,24 @@ int sfs_create(fs_t *fs, char *filename, int size)
     return VFS_ERROR;
 }
 
+// frees direct data blocks
+void sfs_free_direct_blocks(sfs_t *sfs, uint32_t *pointers, uint32_t max_blocks) {
+    uint32_t i;
+    for (i = 0; i < max_blocks; i++)
+        if (pointers[i] != 0)
+            sfs_free_block(sfs, pointers[i]);
+}
+
 // frees all the data blocks & the file block itself
 // returns:
 // - 1 if no error
 // - 0 if error occured reading any of the file blocks
 int sfs_free_file_blocks(sfs_t *sfs, uint32_t file_block) 
 {
-    uint32_t i;
     if (sfs_read_block(sfs, file_block, &(sfs->inode.buffer)) == 0) 
         return 0;
     sfs_free_block(sfs, file_block);
-    for (i = 0; i < SFS_DIRECT_DATA_BLOCKS; i++)
-        if (sfs->inode.node.file.direct_blocks[i] != 0)
-            sfs_free_block(sfs, sfs->inode.node.file.direct_blocks[i]);
+    sfs_free_direct_blocks(sfs, (uint32_t*)&(sfs->inode.node.file.direct_blocks), SFS_DIRECT_DATA_BLOCKS);
 
     // TODO free indirect data blocks
 
