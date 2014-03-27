@@ -77,7 +77,7 @@ int sfs_read_bab_cache(sfs_t *sfs) {
     DEBUG("sfsdebug", "Reading BAB cache from disk\n");
     for (i = 0; i < sfs->bab_count; i++) {
         if (sfs_read_block(sfs, 1 + i, bab_cache) == 0)
-            return 0; 
+            KERNEL_PANIC("SFS: disk read failed in sfs_read_bab_cache, could lead to corruption!\n");
         bab_cache += SFS_BLOCK_SIZE;
     }
     return 1;
@@ -89,7 +89,7 @@ int sfs_write_bab_cache(sfs_t *sfs) {
     DEBUG("sfsdebug", "Writing BAB cache to disk\n");
     for (i = 0; i < sfs->bab_count; i++) {
         if (sfs_write_block(sfs, 1 + i, bab_cache) == 0)
-            return 0; 
+            KERNEL_PANIC("SFS: disk write failed in sfs_write_bab_cache, could have already corrupted FS!\n");
         bab_cache += SFS_BLOCK_SIZE;
     }
     return 1;
@@ -183,7 +183,7 @@ fs_t * sfs_init(gbd_t *disk)
     sfs->lock = lock;
     sfs->block_count = disk->total_blocks(disk);
     sfs->bab_count = ((sfs->block_count - 1) + 1024)/1025;
-    sfs->data_block_count = sfs->block_count + sfs->bab_count - 1;
+    sfs->data_block_count = sfs->block_count - sfs->bab_count - 1;
     sfs->root_inode = sfs->bab_count + 1;
 
     KERNEL_ASSERT(PAGE_SIZE >= sizeof(sfs_t) + sizeof(fs_t) + sfs->bab_count * SFS_BLOCK_SIZE);
@@ -291,14 +291,17 @@ int sfs_close(fs_t *fs, int fileid)
 
 
 // reserves direct blocks to pointers
-// returns the size_left after reserving
-uint32_t sfs_reserve_direct_blocks(sfs_t *sfs, uint32_t size_left, uint32_t *pointers, uint32_t max_blocks) {
+// returns:
+// - the size_left after reserving
+// - -1 if a block reservation fails
+int sfs_reserve_direct_blocks(sfs_t *sfs, int size_left, uint32_t *pointers, uint32_t max_blocks) {
     uint32_t i;
     memoryset(&(sfs->rawbuffer), 0, SFS_BLOCK_SIZE);
     for (i = 0; i < max_blocks && size_left > 0; i++) {
         uint32_t direct_block = sfs_get_free_block(sfs);
         DEBUG("sfsdebug", "reserving block %d for direct file data\n", direct_block);
-        KERNEL_ASSERT(direct_block != 0); // TODO: error handling
+        if (direct_block == 0)
+            return -1;
         // empty out the new file data block
         KERNEL_ASSERT(sfs_write_block(sfs, direct_block, &(sfs->rawbuffer)) != 0);
         size_left -= MIN(size_left, SFS_BLOCK_SIZE);
@@ -307,13 +310,14 @@ uint32_t sfs_reserve_direct_blocks(sfs_t *sfs, uint32_t size_left, uint32_t *poi
     return size_left;
 }
 
-uint32_t sfs_reserve_indirect1_blocks(sfs_t *sfs, uint32_t size_left, uint32_t *pointers, uint32_t max_blocks) {
+int sfs_reserve_indirect1_blocks(sfs_t *sfs, int size_left, uint32_t *pointers, uint32_t max_blocks) {
     uint32_t i;
     memoryset(&(sfs->indirect1), 0, SFS_BLOCK_SIZE);
     for (i = 0; i < max_blocks && size_left > 0; i++) {
         uint32_t indirect1_block = sfs_get_free_block(sfs);
         DEBUG("sfsdebug", "reserving block %d for indirect1 pointer data\n", indirect1_block);
-        KERNEL_ASSERT(indirect1_block != 0); // TODO: error handling
+        if (indirect1_block == 0)
+            return -1;
         size_left = sfs_reserve_direct_blocks(sfs, size_left, (uint32_t*)&(sfs->indirect1), SFS_INDIRECT_POINTERS); 
         KERNEL_ASSERT(sfs_write_block(sfs, indirect1_block, &(sfs->indirect1)) != 0);
         pointers[i] = indirect1_block;
@@ -322,16 +326,32 @@ uint32_t sfs_reserve_indirect1_blocks(sfs_t *sfs, uint32_t size_left, uint32_t *
     return size_left;
 }
 
-uint32_t sfs_reserve_indirect2_blocks(sfs_t *sfs, uint32_t size_left, uint32_t *pointers, uint32_t max_blocks) {
+int sfs_reserve_indirect2_blocks(sfs_t *sfs, int size_left, uint32_t *pointers, uint32_t max_blocks) {
     uint32_t i;
     memoryset(&(sfs->indirect2), 0, SFS_BLOCK_SIZE);
     for (i = 0; i < max_blocks && size_left > 0; i++) {
         uint32_t indirect2_block = sfs_get_free_block(sfs);
         DEBUG("sfsdebug", "reserving block %d for indirect2 pointer data\n", indirect2_block);
-        KERNEL_ASSERT(indirect2_block != 0); // TODO: error handling
+        if (indirect2_block == 0)
+            return -1;
         size_left = sfs_reserve_indirect1_blocks(sfs, size_left, (uint32_t*)&(sfs->indirect2), SFS_INDIRECT_POINTERS); 
         KERNEL_ASSERT(sfs_write_block(sfs, indirect2_block, &(sfs->indirect2)) != 0);
         pointers[i] = indirect2_block;
+    }
+    return size_left;
+}
+
+int sfs_reserve_indirect3_blocks(sfs_t *sfs, int size_left, uint32_t *pointers, uint32_t max_blocks) {
+    uint32_t i;
+    memoryset(&(sfs->indirect3), 0, SFS_BLOCK_SIZE);
+    for (i = 0; i < max_blocks && size_left > 0; i++) {
+        uint32_t indirect3_block = sfs_get_free_block(sfs);
+        DEBUG("sfsdebug", "reserving block %d for indirect3 pointer data\n", indirect3_block);
+        if (indirect3_block == 0)
+            return -1;
+        size_left = sfs_reserve_indirect2_blocks(sfs, size_left, (uint32_t*)&(sfs->indirect3), SFS_INDIRECT_POINTERS); 
+        KERNEL_ASSERT(sfs_write_block(sfs, indirect3_block, &(sfs->indirect3)) != 0);
+        pointers[i] = indirect3_block;
     }
     return size_left;
 }
@@ -443,10 +463,12 @@ int sfs_create(fs_t *fs, char *filename, int size)
 
     // reserve & populate blocks for the file
     // if any of the sfs_get_free_blocks fails, free all the already reserved blocks
+    // by calling sfs_read_bab_cache
 
     uint32_t file_block = sfs_get_free_block(sfs);
     if (file_block == 0) {
         DEBUG("sfsdebug", "SFS sfs_create: failed, disk full\n");
+        sfs_read_bab_cache(sfs);
         lock_release(sfs->lock);
         return VFS_ERROR;
     }
@@ -456,7 +478,7 @@ int sfs_create(fs_t *fs, char *filename, int size)
 
     // reserve enough space for the file:
 
-    uint32_t size_left = (uint32_t)size;
+    int size_left = size;
 
     // - direct blocks
     size_left = sfs_reserve_direct_blocks(sfs, size_left, (uint32_t*)&(sfs->inode.node.file.direct_blocks), SFS_DIRECT_DATA_BLOCKS);
@@ -467,15 +489,32 @@ int sfs_create(fs_t *fs, char *filename, int size)
     // - second indirect blocks
     if (size_left > 0)
         size_left = sfs_reserve_indirect2_blocks(sfs, size_left, &(sfs->inode.node.file.second_indirect), 1);
+    if (size_left > 0) 
+        size_left = sfs_reserve_indirect3_blocks(sfs, size_left, &(sfs->inode.node.file.third_indirect), 1);
+
+    // if any of the block reservations failed (i.e. disk got full), rollback the block reservations
+    // by reading BABs from the disk again
+    if (size_left == -1) {  
+        DEBUG("sfsdebug", "SFS sfs_create: failed, disk full\n");
+        sfs_read_bab_cache(sfs);
+        lock_release(sfs->lock);
+        return VFS_ERROR;
+    }
 
     KERNEL_ASSERT(size_left == 0);
 
-    sfs_write_block(sfs, file_block, &(sfs->inode.buffer));
+    // write the file block
+    if (sfs_write_block(sfs, file_block, &(sfs->inode.buffer)) == 0) {
+        sfs_read_bab_cache(sfs);
+        lock_release(sfs->lock);
+        return VFS_ERROR;
+    }
 
     // required blocks for the file have been reserved, now add it to the directory inode
      
     r = sfs_read_block(sfs, dir_inode_with_free_entry, &(sfs->inode.buffer));
     if (r == 0) {
+        sfs_read_bab_cache(sfs);
         lock_release(sfs->lock);
         return VFS_ERROR;
     }
@@ -489,12 +528,14 @@ int sfs_create(fs_t *fs, char *filename, int size)
             dir_inode->entries[i].inode = file_block; 
             stringcopy(dir_inode->entries[i].name, filename, SFS_FILENAME_MAX);
             r = sfs_write_block(sfs, dir_inode_with_free_entry, &(sfs->inode.buffer));
-            lock_release(sfs->lock);
             if (r == 0) {
+                sfs_read_bab_cache(sfs);
+                lock_release(sfs->lock);
                 return VFS_ERROR;
             } else {
                 // persist the allocated blocks
                 sfs_write_bab_cache(sfs);
+                lock_release(sfs->lock);
                 return VFS_OK;
             }
         }
