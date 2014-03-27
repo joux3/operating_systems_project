@@ -259,7 +259,7 @@ int sfs_unmount(fs_t *fs)
 // returns:
 // - the file inode block number if found
 // - 0 if not found
-uint32_t sfs_find_file(sfs_t *sfs, char *filename) 
+uint32_t sfs_find_file_and_dir(sfs_t *sfs, char *filename, uint32_t *dir_block) 
 {
     int r;
     uint32_t cur_dir_block, i;
@@ -277,6 +277,8 @@ uint32_t sfs_find_file(sfs_t *sfs, char *filename)
         dir_inode = &(sfs->inode.node.dir);
         for (i = 0; i < SFS_ENTRIES_PER_DIR; i++) {
             if (dir_inode->entries[i].inode > 0 && stringcmp(dir_inode->entries[i].name, filename) == 0) {
+                if (dir_block != NULL)
+                    *dir_block = cur_dir_block;
                 return dir_inode->entries[i].inode;
             }
         } 
@@ -288,6 +290,9 @@ uint32_t sfs_find_file(sfs_t *sfs, char *filename)
     }
 }
 
+uint32_t sfs_find_file(sfs_t *sfs, char *filename) {
+    return sfs_find_file_and_dir(sfs, filename, NULL);
+}
 
 /**
  * Opens file. Implements fs.open(). Reads directory block of sfs
@@ -601,8 +606,17 @@ int sfs_create(fs_t *fs, char *filename, int size)
  */
 int sfs_remove(fs_t *fs, char *filename) 
 {
-    fs = fs;
-    filename = filename;
+    sfs_t *sfs = fs->internal;
+    lock_acquire(sfs->lock);
+
+    uint32_t dir_block;
+    uint32_t file_block = sfs_find_file_and_dir(sfs, filename, &dir_block);
+    if (file_block == 0) {
+        lock_release(sfs->lock);
+        return VFS_ERROR;
+    }
+
+    lock_release(sfs->lock);
     return VFS_ERROR;
 }
 
