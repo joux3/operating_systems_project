@@ -39,6 +39,9 @@
 #include "drivers/disk.h"
 #include "drivers/yams.h"
 #include "drivers/metadev.h"
+#ifdef CHANGED_3
+    #include "drivers/network.h"
+#endif
 
 /**  
  * A table of available device drivers.
@@ -50,5 +53,6 @@ drivers_available_t drivers_available[] = {
     {YAMS_TYPECODE_SHUTDOWN, "System shutdown", &shutdown_init} ,
     {YAMS_TYPECODE_CPUSTATUS, "CPU status", &cpustatus_init} ,
     {YAMS_TYPECODE_DISK, "Disk", &disk_init},
+    {YAMS_TYPECODE_NIC, "NIC", &nic_init},
     {0, NULL, NULL}
 };

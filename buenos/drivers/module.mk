@@ -4,6 +4,6 @@
 MODULE := drivers
 
 FILES := polltty.c _timer.S timer.c bootargs.c device.c drivers.c tty.c \
-	 disk.c disksched.c metadev.c
+	 disk.c disksched.c metadev.c network.c
 
 SRC += $(patsubst %, $(MODULE)/%, $(FILES))
