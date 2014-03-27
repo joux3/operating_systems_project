@@ -801,11 +801,13 @@ int sfs_write(fs_t *fs, int fileid, void *buffer, int datasize, int offset)
                 // copy to the buffer
                 int in_this_block = MIN(SFS_BLOCK_SIZE - (offset % SFS_BLOCK_SIZE), datasize);
                 memcopy(in_this_block, raw_buffer + (offset % SFS_BLOCK_SIZE), buffer); 
+                DEBUG("sfsdebug", "Writing block %d, %d new bytes\n", inode->file.direct_blocks[block], in_this_block);
                 if (sfs_write_block(sfs, inode->file.direct_blocks[block], raw_buffer) == 0) 
                     goto error;
                 written += in_this_block;
                 datasize -= in_this_block;
                 offset += in_this_block;
+                buffer = (void*)((uint32_t)buffer + in_this_block);
             }
         }
     }
@@ -813,11 +815,10 @@ int sfs_write(fs_t *fs, int fileid, void *buffer, int datasize, int offset)
     
     buffer = buffer;
 
-
 success:
     pagepool_free_phys_page(ADDR_KERNEL_TO_PHYS(addr));
     lock_release(sfs->lock);
-    return 0; // TODO return written
+    return written;
 error:
     pagepool_free_phys_page(ADDR_KERNEL_TO_PHYS(addr));
     lock_release(sfs->lock);
