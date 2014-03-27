@@ -275,6 +275,7 @@ uint32_t sfs_find_file_and_dir(sfs_t *sfs, char *filename, uint32_t *dir_block)
             if (dir_inode->entries[i].inode > 0 && stringcmp(dir_inode->entries[i].name, filename) == 0) {
                 if (dir_block != NULL)
                     *dir_block = cur_dir_block;
+                // TODO: check that the inode is actually a file inode, with dir support it might be a dir
                 return dir_inode->entries[i].inode;
             }
         } 
@@ -749,11 +750,47 @@ int sfs_read(fs_t *fs, int fileid, void *buffer, int bufsize, int offset)
  */ 
 int sfs_write(fs_t *fs, int fileid, void *buffer, int datasize, int offset)
 {
-    fs = fs;
+    sfs_t *sfs = fs->internal;
+    // TODO: improve concurrency and remove full locking
+    lock_acquire(sfs->lock);
+
+    // currently file id points to the file block, so validate it
+    if (fileid <= (int)sfs->bab_count || fileid >= (int)sfs->block_count) {
+        lock_release(sfs->lock);
+        return VFS_ERROR;
+    }
+
+    uint32_t addr = pagepool_get_phys_page();
+    if (addr == 0) {
+        lock_release(sfs->lock);
+        return VFS_ERROR;
+    }
+    addr = ADDR_PHYS_TO_KERNEL(addr);
+    sfs_inode_t *inode = (sfs_inode_t*)addr;
+    uint32_t *indirect1 = (uint32_t*)(addr + sizeof(sfs_inode_t));
+    uint32_t *indirect2 = (uint32_t*)(addr + sizeof(sfs_inode_t) + 1 * SFS_BLOCK_SIZE);
+    uint32_t *indirect3 = (uint32_t*)(addr + sizeof(sfs_inode_t) + 2 * SFS_BLOCK_SIZE);
+
+    if (sfs_read_block(sfs, fileid, inode) == 0) {
+        goto error; 
+    }
+    
+    datasize = MIN(datasize, (int)inode->file.filesize - offset);
+    if (datasize == 0) 
+        goto success;
+    
     fileid = fileid;
     buffer = buffer;
     datasize = datasize;
     offset = offset;
+
+success:
+    pagepool_free_phys_page(ADDR_KERNEL_TO_PHYS(addr));
+    lock_release(sfs->lock);
+    return 0; // TODO return written
+error:
+    pagepool_free_phys_page(ADDR_KERNEL_TO_PHYS(addr));
+    lock_release(sfs->lock);
     return VFS_ERROR;
 }
 
