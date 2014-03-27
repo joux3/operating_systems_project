@@ -597,6 +597,33 @@ void sfs_free_direct_blocks(sfs_t *sfs, uint32_t *pointers, uint32_t max_blocks)
             sfs_free_block(sfs, pointers[i]);
 }
 
+int sfs_free_indirect1_blocks(sfs_t *sfs, uint32_t *pointers, uint32_t max_blocks) {
+    uint32_t i;
+    for (i = 0; i < max_blocks; i++) {
+        if (pointers[i] != 0) {
+            if (sfs_read_block(sfs, pointers[i], &(sfs->indirect1)) == 0) 
+                return 0;
+            sfs_free_direct_blocks(sfs, (uint32_t*)&(sfs->indirect1), SFS_INDIRECT_POINTERS);
+            sfs_free_block(sfs, pointers[i]);
+        }
+    }
+    return 1;
+}
+
+int sfs_free_indirect2_blocks(sfs_t *sfs, uint32_t *pointers, uint32_t max_blocks) {
+    uint32_t i;
+    for (i = 0; i < max_blocks; i++) {
+        if (pointers[i] != 0) {
+            if (sfs_read_block(sfs, pointers[i], &(sfs->indirect2)) == 0) 
+                return 0;
+            if (sfs_free_indirect1_blocks(sfs, (uint32_t*)&(sfs->indirect2), SFS_INDIRECT_POINTERS) == 0)
+                return 0;
+            sfs_free_block(sfs, pointers[i]);
+        }
+    }
+    return 1;
+}
+
 // frees all the data blocks & the file block itself
 // returns:
 // - 1 if no error
@@ -607,8 +634,12 @@ int sfs_free_file_blocks(sfs_t *sfs, uint32_t file_block)
         return 0;
     sfs_free_block(sfs, file_block);
     sfs_free_direct_blocks(sfs, (uint32_t*)&(sfs->inode.node.file.direct_blocks), SFS_DIRECT_DATA_BLOCKS);
+    if (sfs_free_indirect1_blocks(sfs, &(sfs->inode.node.file.first_indirect), 1) == 0)
+        return 0;
+    if (sfs_free_indirect2_blocks(sfs, &(sfs->inode.node.file.second_indirect), 1) == 0)
+        return 0;
 
-    // TODO free indirect data blocks
+    // TODO free third indirect data blocks
 
     return 1;
 }
