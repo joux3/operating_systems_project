@@ -761,11 +761,25 @@ int sfs_read(fs_t *fs, int fileid, void *buffer, int bufsize, int offset)
         goto success;
     }
 
-    buffer = buffer;
-    bufsize = bufsize;
-    offset = offset;
-
-    
+    KERNEL_ASSERT(offset + bufsize <= (int)SFS_DIRECT_SIZE); // TODO, only supports direct blocks now
+    if (offset <= (int)SFS_DIRECT_SIZE) {
+        int block;
+        for (block = 0; block < (int)SFS_DIRECT_DATA_BLOCKS && bufsize > 0; block++) {
+            if (offset >= block * (int)SFS_BLOCK_SIZE && offset < (block + 1) * (int)SFS_BLOCK_SIZE) {
+                // read touches this block
+                DEBUG("sfsdebug", "Reading block %d\n", inode->file.direct_blocks[block]);
+                if (sfs_read_block(sfs, inode->file.direct_blocks[block], raw_buffer) == 0) 
+                    goto error;
+                // copy to the buffer
+                int in_this_block = MIN(SFS_BLOCK_SIZE - (offset % SFS_BLOCK_SIZE), bufsize);
+                memcopy(in_this_block, buffer, raw_buffer + (offset % SFS_BLOCK_SIZE)); 
+                read += in_this_block;
+                bufsize -= in_this_block;
+                offset += in_this_block;
+                buffer = (void*)((uint32_t)buffer + in_this_block);
+            }
+        }
+    }
     KERNEL_ASSERT(bufsize == 0);
 
 success:
@@ -833,7 +847,7 @@ int sfs_write(fs_t *fs, int fileid, void *buffer, int datasize, int offset)
     if (datasize == 0) 
         goto success;
 
-    KERNEL_ASSERT(offset + datasize <= (int)SFS_DIRECT_SIZE); // Todo, only supports direct blocks now
+    KERNEL_ASSERT(offset + datasize <= (int)SFS_DIRECT_SIZE); // TODO, only supports direct blocks now
     if (offset <= (int)SFS_DIRECT_SIZE) {
         int block;
         for (block = 0; block < (int)SFS_DIRECT_DATA_BLOCKS && datasize > 0; block++) {
