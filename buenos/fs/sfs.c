@@ -32,12 +32,13 @@ typedef struct {
     uint32_t block_count;
     uint32_t data_block_count;
 
+    // pointer to the BABs read from disk
+    union {
+        char *buffer;
+        bitmap_t *bitmap;
+    } bab_cache;
     // allocate here to save stack space
     // NOTE: do not use these when not holding sfs->lock
-    union {
-        char buffer[SFS_BLOCK_SIZE];
-        bitmap_t bitmap;
-    } bab;
     union { 
         char buffer[SFS_BLOCK_SIZE];
         sfs_inode_t node;
@@ -70,36 +71,40 @@ int sfs_write_block(sfs_t *sfs, uint32_t block, void *buffer) {
     return sfs->disk->write_block(sfs->disk, &req);
 }
 
-int sfs_is_block_free(sfs_t *sfs, uint32_t block) {
-    int r, offset_in_bab;
-    uint32_t bab_block;
-    
-    KERNEL_ASSERT(block < sfs->data_block_count);
-    bab_block = block / SFS_BLOCKS_PER_BAB;
-    KERNEL_ASSERT(bab_block < sfs->bab_count);
-    
-    // on disk the first block is magic block
-    r = sfs_read_block(sfs, bab_block + 1, &(sfs->bab.buffer)); 
-    KERNEL_ASSERT(r != 0);
+int sfs_read_bab_cache(sfs_t *sfs) {
+    uint32_t i;
+    char *bab_cache = sfs->bab_cache.buffer;
+    DEBUG("sfsdebug", "Reading BAB cache from disk\n");
+    for (i = 0; i < sfs->bab_count; i++) {
+        if (sfs_read_block(sfs, 1 + i, bab_cache) == 0)
+            return 0; 
+        bab_cache += SFS_BLOCK_SIZE;
+    }
+    return 1;
+}
 
-    offset_in_bab = block - bab_block * SFS_BLOCKS_PER_BAB;
-    return bitmap_get(&sfs->bab.bitmap, offset_in_bab) == 0;
+int sfs_write_bab_cache(sfs_t *sfs) {
+    uint32_t i;
+    char *bab_cache = sfs->bab_cache.buffer;
+    DEBUG("sfsdebug", "Writing BAB cache to disk\n");
+    for (i = 0; i < sfs->bab_count; i++) {
+        if (sfs_write_block(sfs, 1 + i, bab_cache) == 0)
+            return 0; 
+        bab_cache += SFS_BLOCK_SIZE;
+    }
+    return 1;
+}
+
+int sfs_is_block_free(sfs_t *sfs, uint32_t block) {
+    return bitmap_get(sfs->bab_cache.bitmap, block) == 0;
 }
 
 // finds a free block and marks it as used
 // returns 0 if none is found
 uint32_t sfs_get_free_block(sfs_t *sfs) {
-    uint32_t i, blocks_in_last_bab;
-    int free_block;
-    blocks_in_last_bab = sfs->data_block_count - (sfs->bab_count - 1) * SFS_BLOCKS_PER_BAB;
-    for (i = 0; i < sfs->bab_count; i++) {
-        int in_this_bab = (i == (sfs->bab_count - 1)) ? blocks_in_last_bab : SFS_BLOCKS_PER_BAB;
-        KERNEL_ASSERT(sfs_read_block(sfs, 1 + i, &(sfs->bab.buffer)) != 0);
-        free_block = bitmap_findnset(&(sfs->bab.bitmap), in_this_bab);
-        if (free_block != -1) {
-            KERNEL_ASSERT(sfs_write_block(sfs, 1 + i, &(sfs->bab.buffer)) != 0); 
-            return 1 + sfs->bab_count + (i * SFS_BLOCKS_PER_BAB) + (uint32_t)free_block;
-        }
+    int free_block = bitmap_findnset(sfs->bab_cache.bitmap, sfs->data_block_count);
+    if (free_block != -1) {
+        return 1 + sfs->bab_count + (uint32_t)free_block;
     }
     return 0;
 }
@@ -180,6 +185,16 @@ fs_t * sfs_init(gbd_t *disk)
     sfs->bab_count = ((sfs->block_count - 1) + 1024)/1025;
     sfs->data_block_count = sfs->block_count + sfs->bab_count - 1;
     sfs->root_inode = sfs->bab_count + 1;
+
+    KERNEL_ASSERT(PAGE_SIZE >= sizeof(sfs_t) + sizeof(fs_t) + sfs->bab_count * SFS_BLOCK_SIZE);
+
+    sfs->bab_cache.buffer = (char*)(addr + sizeof(fs_t) + sizeof(sfs_t));
+    if (sfs_read_bab_cache(sfs) == 0) {
+        lock_destroy(lock);
+        pagepool_free_phys_page(ADDR_KERNEL_TO_PHYS(addr));
+        kprintf("sfs_init: Failed to read Block Allocation Blocks.\n");
+        return NULL;
+    }
 
     DEBUG("sfsdebug", "SFS: Found %d BABs, %d total blocks\n", sfs->bab_count, sfs->block_count);
 
@@ -478,6 +493,8 @@ int sfs_create(fs_t *fs, char *filename, int size)
             if (r == 0) {
                 return VFS_ERROR;
             } else {
+                // persist the allocated blocks
+                sfs_write_bab_cache(sfs);
                 return VFS_OK;
             }
         }
