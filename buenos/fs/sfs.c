@@ -768,8 +768,17 @@ int sfs_write(fs_t *fs, int fileid, void *buffer, int datasize, int offset)
  */
 int sfs_getfree(fs_t *fs)
 {
-    fs = fs;
-    return VFS_ERROR;
+    uint32_t i;
+    uint32_t free_blocks = 0;
+    sfs_t *sfs = fs->internal;
+    lock_acquire(sfs->lock);
+    
+    for (i = 0; i < sfs->data_block_count; i++) {
+        free_blocks += bitmap_get(sfs->bab_cache.bitmap, i);
+    }
+
+    lock_release(sfs->lock);
+    return free_blocks * SFS_BLOCK_SIZE;
 }
 
 #endif
