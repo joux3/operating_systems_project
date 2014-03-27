@@ -33,6 +33,21 @@
 #define NIC_STATUS_EBUSY(status)  ((status) & 0x40000000)
 #define NIC_STATUS_ERROR(status)  ((status) & 0xf8000000)
 
+typedef struct {
+    volatile uint32_t status;
+    volatile uint32_t command;
+    volatile uint32_t hwaddr;
+    volatile uint32_t mtu;
+    volatile uint32_t dmaaddr;
+} nic_io_area_t;
+
+typedef struct {
+    spinlock_t slock;
+    uint8_t send_sleepq;
+    uint8_t recv_sleepp;
+    uint8_t recv_done_sleepq;
+} real_nic_device_t;
+
 device_t *nic_init(io_descriptor_t *desc);
 
 #endif // Include guard
