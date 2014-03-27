@@ -12,7 +12,7 @@
 
 
 #define NIC_COMMAND_DMA_RECV        0x01
-#define NIC_COMMAND_DMA_SND         0x02
+#define NIC_COMMAND_DMA_SEND        0x02
 #define NIC_COMMAND_CLEAR_RXIRQ     0x03
 #define NIC_COMMAND_CLEAR_RIRQ      0x04
 #define NIC_COMMAND_CLEAR_SIRQ      0x05
@@ -46,7 +46,7 @@ typedef struct {
     uint8_t send_sleepq;
     uint8_t recv_sleepp;
     uint8_t recv_done_sleepq;
-} real_nic_device_t;
+} nic_real_device_t;
 
 device_t *nic_init(io_descriptor_t *desc);
 
