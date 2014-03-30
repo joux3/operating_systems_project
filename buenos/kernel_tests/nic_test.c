@@ -9,7 +9,7 @@
 #include "kernel/assert.h"
 
 void nic_test_main(void) {
-    int data = 1;
+    int data = 112233;
     void *buffer = &data;
     network_address_t addr = 0x0f01beef;
     network_address_t broadcast = network_get_broadcast_address();

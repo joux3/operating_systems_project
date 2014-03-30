@@ -31,7 +31,7 @@
 #define NIC_STATUS_IADDR(status)  ((status) & 0x10000000)
 #define NIC_STATUS_ICOMM(status)  ((status) & 0x20000000)
 #define NIC_STATUS_EBUSY(status)  ((status) & 0x40000000)
-#define NIC_STATUS_ERROR(status)  ((status) & 0xf8000000)
+#define NIC_STATUS_ERROR(status)  ((status) & 0x80000000)
 
 typedef struct {
     volatile uint32_t status;
