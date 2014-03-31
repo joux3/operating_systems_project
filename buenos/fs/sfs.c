@@ -2,6 +2,7 @@
 
 #include "kernel/kmalloc.h"
 #include "kernel/assert.h"
+#include "kernel/semaphore.h"
 #include "vm/pagepool.h"
 #include "drivers/gbd.h"
 #include "fs/vfs.h"
@@ -11,6 +12,17 @@
 #include "lib/debug.h"
 
 
+/* Data structure used to represent an open file in sfs file system */
+
+typedef struct {
+    //lock guarding write
+    lock_t *lock;
+    //semaphore guarding concurrent readers
+    semaphore_t *sem; 
+    int open_count, is_deleted;
+    uint32_t file_block;
+} sfs_open_file_t;
+
 /* Data structure used internally by SFS filesystem. This data structure 
    is used by sfs-functions. it is initialized during sfs_init(). Also
    memory for the buffers is reserved _dynamically_ during init.
@@ -18,6 +30,7 @@
    Buffers are used when reading/writing system or data blocks from/to 
    disk.
 */
+
 typedef struct {
     /* Pointer to gbd device performing sfs */
     gbd_t          *disk;
@@ -47,7 +60,10 @@ typedef struct {
     uint32_t indirect3[SFS_BLOCK_SIZE / sizeof(uint32_t)];
     // some raw data
     char rawbuffer[SFS_BLOCK_SIZE];
+    //open files
+    sfs_open_file_t open_files[SFS_MAX_OPEN_FILES];
 } sfs_t;
+
 
 #define SFS_BLOCKS_PER_BAB (SFS_BLOCK_SIZE * 8)
 
@@ -179,6 +195,11 @@ fs_t * sfs_init(gbd_t *disk)
     fs = (fs_t*)addr;
     sfs = (sfs_t*)(addr + sizeof(fs_t));
 
+    int i;
+    for(i = 0; i < SFS_MAX_OPEN_FILES; i++) {
+        sfs->open_files[i].open_count = 0;    
+
+    }
     sfs->disk = disk;
     sfs->lock = lock;
     sfs->block_count = disk->total_blocks(disk);
@@ -242,12 +263,19 @@ fs_t * sfs_init(gbd_t *disk)
  */
 int sfs_unmount(fs_t *fs) 
 {
+    int i;
     sfs_t *sfs;
     sfs = (sfs_t*)fs->internal;
 
+    // close all open files
+    for(i = 0; i < SFS_MAX_OPEN_FILES; i++) {
+        if(sfs->open_files[i].open_count > 0) {
+            sfs_close(fs, i);
+        }
+    }
     lock_acquire(sfs->lock); 
-
     lock_destroy(sfs->lock); 
+
     pagepool_free_phys_page(ADDR_KERNEL_TO_PHYS((uint32_t)fs));
     return VFS_OK;
 }
@@ -291,6 +319,16 @@ uint32_t sfs_find_file(sfs_t *sfs, char *filename) {
     return sfs_find_file_and_dir(sfs, filename, NULL);
 }
 
+//return incex to table or -1 if not found
+int sfs_find_open_file(sfs_t *sfs, uint32_t header_block) {
+    int i = 0;
+    for(i = 0; i < SFS_MAX_OPEN_FILES; i++) {
+        if(sfs->open_files[i].open_count > 0 && sfs->open_files[i].file_block == header_block)
+            return i;
+    }
+    return -1;
+}
+
 /**
  * Opens file. Implements fs.open(). Reads directory block of sfs
  * device and finds given file. Returns file's inode block number or
@@ -302,37 +340,54 @@ uint32_t sfs_find_file(sfs_t *sfs, char *filename) {
  * @return If file found, return inode block number as fileid, otherwise
  * return VFS_NOT_FOUND.
  */
-int sfs_open(fs_t *fs, char *filename)
-{
+int sfs_open(fs_t *fs, char *filename) {
     sfs_t *sfs = fs->internal;
+    int i, index;
     lock_acquire(sfs->lock);
-    // TODO: create the required data structures for concurrent read/write
     uint32_t file_inode = sfs_find_file(sfs, filename);
-    lock_release(sfs->lock);
     DEBUG("sfsdebug", "SFS_open: file block %d, name %s\n", file_inode, filename);
-    if (file_inode == 0) {
-        return VFS_ERROR;
-    } else {
-        return file_inode;
+    if (file_inode == 0)
+        goto error; 
+
+    index = -1;
+    //find if file is already open
+    index = sfs_find_open_file(sfs, file_inode);
+    //file not open so initialize new open file
+    if(index < 0) {
+        for(i = 0; i < SFS_MAX_OPEN_FILES; i++) {
+            if(sfs->open_files[i].open_count == 0) {
+                index = i;
+                break;
+            }
+        }
+        //no open spots found
+        if(index < 0) 
+            goto error;
+
+        sfs_open_file_t f;
+        f.lock = lock_create();
+        if(f.lock == NULL)
+            goto error;
+        f.sem = semaphore_create(SFS_MAX_READERS);
+        if(f.sem == NULL) {
+            lock_destroy(f.lock);
+            goto error;
+        }
+        f.is_deleted = 0;
+        f.file_block = file_inode;
+        f.open_count = 0;
+        sfs->open_files[index] = f;
     }
-}
+    sfs->open_files[index].open_count++;
+    lock_release(sfs->lock);
+    return index;
 
-
-/**
- * Closes file. Implements fs.close()
- *
- * @param fs Pointer to fs data structure of the device.
- * @param fileid File id (inode block number) of the file.
- *
- * @return VFS_OK
- */
-int sfs_close(fs_t *fs, int fileid)
-{
-    // TODO: free the required data structures for concurrent read/write
-    fs = fs;
-    fileid = fileid;
+    error:
+    lock_release(sfs->lock);
     return VFS_ERROR;
 }
+
+
 
 
 // reserves direct blocks to pointers
@@ -660,6 +715,42 @@ int sfs_free_file_blocks(sfs_t *sfs, uint32_t file_block)
 }
 
 /**
+ * Closes file. Implements fs.close()
+ *
+ * @param fs Pointer to fs data structure of the device.
+ * @param fileid File id (inode block number) of the file.
+ *
+ * @return VFS_OK
+ */
+int sfs_close(fs_t *fs, int fileid)
+{
+    sfs_open_file_t *f;
+    sfs_t *sfs = (sfs_t*)fs->internal;
+    lock_acquire(sfs->lock);
+
+    f = &(sfs->open_files[fileid]);
+    f->open_count--;
+    //if file is deleted and this is the last process to close it delete file
+    if(f->is_deleted && f->open_count == 0) {
+        if(sfs_free_file_blocks(sfs, f->file_block) == 0) {
+            lock_release(sfs->lock);
+            return VFS_ERROR;	
+        }
+        sfs_write_bab_cache(sfs);
+
+        lock_acquire(f->lock);
+        int i;
+        for(i = 0; i < SFS_MAX_READERS; i++) {
+            semaphore_P(f->sem);
+        }
+        semaphore_destroy(f->sem);
+        lock_destroy(f->lock);
+    }
+    lock_release(sfs->lock);
+    return VFS_OK;
+}
+
+/**
  * Removes given file. Implements fs.remove(). Frees blocks allocated
  * for the file and directory entry.
  *
@@ -669,6 +760,7 @@ int sfs_free_file_blocks(sfs_t *sfs, uint32_t file_block)
  * @return VFS_OK if file succesfully removed. If file not found
  * VFS_NOT_FOUND.
  */
+
 int sfs_remove(fs_t *fs, char *filename) 
 {
     int i;
@@ -694,8 +786,17 @@ int sfs_remove(fs_t *fs, char *filename)
     }
     if (sfs_write_block(sfs, dir_block, &(sfs->inode.buffer)) == 0) 
         goto error;
-    if (sfs_free_file_blocks(sfs, file_block) == 0) 
-        goto error;
+    
+    int open_index = sfs_find_open_file(sfs, file_block);
+    //if file is not open by anyone free all blocks
+    if(open_index < 0) {
+        if (sfs_free_file_blocks(sfs, file_block) == 0) 
+            goto error;
+    }
+    //else mark it as deleted
+    else {
+        sfs->open_files[open_index].is_deleted = 1;
+    }
 
     sfs_write_bab_cache(sfs);
     lock_release(sfs->lock);
@@ -724,18 +825,18 @@ error:
 int sfs_read(fs_t *fs, int fileid, void *buffer, int bufsize, int offset)
 {
     sfs_t *sfs = fs->internal;
-    lock_acquire(sfs->lock);
-    // TODO: improve concurrency and remove full locking
+    sfs_open_file_t* f = &(sfs->open_files[fileid]);
+    semaphore_P(f->sem);
 
     // currently file id points to the file block, so validate it
     if (fileid <= (int)sfs->bab_count || fileid >= (int)sfs->block_count) {
-        lock_release(sfs->lock);
+        semaphore_V(f->sem);
         return VFS_ERROR;
     }
 
     uint32_t addr = pagepool_get_phys_page();
     if (addr == 0) {
-        lock_release(sfs->lock);
+        semaphore_V(f->sem);
         return VFS_ERROR;
     }
     addr = ADDR_PHYS_TO_KERNEL(addr);
@@ -784,11 +885,11 @@ int sfs_read(fs_t *fs, int fileid, void *buffer, int bufsize, int offset)
 
 success:
     pagepool_free_phys_page(ADDR_KERNEL_TO_PHYS(addr));
-    lock_release(sfs->lock);
+    semaphore_V(f->sem);
     return read;
 error:
     pagepool_free_phys_page(ADDR_KERNEL_TO_PHYS(addr));
-    lock_release(sfs->lock);
+    semaphore_V(f->sem);
     return VFS_ERROR;
 }
 
@@ -838,20 +939,29 @@ int sfs_write_direct_blocks(sfs_t *sfs, void **buffer, char *raw_buffer, uint32_
  */ 
 int sfs_write(fs_t *fs, int fileid, void *buffer, int datasize, int offset)
 {
+    int i;
+    int retval = 0;
     sfs_t *sfs = fs->internal;
-    // TODO: improve concurrency and remove full locking
-    lock_acquire(sfs->lock);
-
-    // currently file id points to the file block, so validate it
-    if (fileid <= (int)sfs->bab_count || fileid >= (int)sfs->block_count) {
-        lock_release(sfs->lock);
-        return VFS_ERROR;
+    
+    sfs_open_file_t* f = &(sfs->open_files[fileid]);
+    //lock this up so that only one thread can access the semaphore
+    lock_acquire(f->lock);
+    //starve all the readers out
+    for(i = 0; i < SFS_MAX_READERS; i++) {
+        semaphore_P(f->sem);
     }
+    // currently file id points to the file block, so validate it
+    /* TODO is this necessary?
+    if (f->file_block <= (int)sfs->bab_count || f->file_block >= (int)sfs->block_count) {
+        retval = VFS_ERROR;
+        goto exit2;
+    }
+    */
 
     uint32_t addr = pagepool_get_phys_page();
     if (addr == 0) {
-        lock_release(sfs->lock);
-        return VFS_ERROR;
+        retval = VFS_ERROR;
+        goto exit2;
     }
     addr = ADDR_PHYS_TO_KERNEL(addr);
     sfs_inode_t *inode = (sfs_inode_t*)addr;
@@ -859,36 +969,39 @@ int sfs_write(fs_t *fs, int fileid, void *buffer, int datasize, int offset)
     uint32_t *indirect2 = (uint32_t*)(addr + sizeof(sfs_inode_t) + 1 * SFS_BLOCK_SIZE);
     uint32_t *indirect3 = (uint32_t*)(addr + sizeof(sfs_inode_t) + 2 * SFS_BLOCK_SIZE);
     char *raw_buffer    = (char*)(addr + sizeof(sfs_inode_t) + 3 * SFS_BLOCK_SIZE);
-    int written = 0;
     // TODO REMOVE
     indirect1 = indirect1;
     indirect2 = indirect2;
     indirect3 = indirect3;
 
-    if (sfs_read_block(sfs, fileid, inode) == 0)
-        goto error; 
-    if (offset < 0 || offset > (int)inode->file.filesize) 
-        goto error;
-    
+    if (sfs_read_block(sfs, fileid, inode) == 0) {
+        retval = VFS_ERROR;
+        goto exit1;
+    }
+    if (offset < 0 || offset > (int)inode->file.filesize) {
+        retval = VFS_ERROR;
+        goto exit1;
+    }
     datasize = MIN(datasize, (int)inode->file.filesize - offset);
-    if (datasize == 0) 
-        goto success;
+    if (datasize == 0) {
+        goto exit1;
+    }
 
     KERNEL_ASSERT(offset + datasize <= (int)SFS_DIRECT_SIZE); // TODO, only supports direct blocks now
     if (offset <= (int)SFS_DIRECT_SIZE) {
-        written += sfs_write_direct_blocks(sfs, &buffer, raw_buffer, (uint32_t*)&(inode->file.direct_blocks), SFS_DIRECT_DATA_BLOCKS, &datasize, &offset);
+        retval += sfs_write_direct_blocks(sfs, &buffer, raw_buffer, (uint32_t*)&(inode->file.direct_blocks), SFS_DIRECT_DATA_BLOCKS, &datasize, &offset);
     }
-
     KERNEL_ASSERT(datasize == 0);
     
-success:
+exit1:
     pagepool_free_phys_page(ADDR_KERNEL_TO_PHYS(addr));
-    lock_release(sfs->lock);
-    return written;
-error:
-    pagepool_free_phys_page(ADDR_KERNEL_TO_PHYS(addr));
-    lock_release(sfs->lock);
-    return VFS_ERROR;
+exit2:
+    //free all readers 
+    for(i = 0; i < SFS_MAX_READERS; i++) {
+        semaphore_V(f->sem);
+    }
+    lock_release(f->lock);
+    return retval;
 }
 
 /**

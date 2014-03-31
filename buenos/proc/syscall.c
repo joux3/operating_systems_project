@@ -173,19 +173,20 @@ int close_file(int filehandle) {
 }
 
 int seek_file(int filehandle, int pos) {
-    int result;
     lock_acquire(process_filehandle_lock);
     filehandle -= 3;
     if (filehandle < 0 || filehandle >= CONFIG_MAX_OPEN_FILES) { 
-        result = -1;
+        lock_release(process_filehandle_lock);
+        return -1;
     } else if (!process_filehandle_table[filehandle].in_use ||
         process_filehandle_table[filehandle].owner != thread_get_current_process()) {
-        result = -1;
+        lock_release(process_filehandle_lock);
+        return -1;
     } else {
-        result = vfs_seek(process_filehandle_table[filehandle].vfs_handle, pos);
+        process_filehandle_t *handle_entry = &process_filehandle_table[filehandle];
+        lock_release(process_filehandle_lock);
+        return vfs_seek(handle_entry->vfs_handle, pos);
     }
-    lock_release(process_filehandle_lock);
-    return result;
 }
 
 int read_from_handle(int filehandle, void* buffer, int length) {
@@ -204,11 +205,12 @@ int read_from_handle(int filehandle, void* buffer, int length) {
         lock_acquire(process_filehandle_lock);
         process_filehandle_t *handle_entry = &process_filehandle_table[filehandle - 3];
         if (handle_entry->in_use && handle_entry->owner == thread_get_current_process()) {
+            lock_release(process_filehandle_lock);
             result = vfs_read(handle_entry->vfs_handle, kernel_buffer, length);
         } else {
+            lock_release(process_filehandle_lock);
             result = -1;
         }
-        lock_release(process_filehandle_lock);
     } else {
         result = -1;
     }
@@ -243,11 +245,12 @@ int write_to_handle(int filehandle, void* buffer, int length) {
         lock_acquire(process_filehandle_lock);
         process_filehandle_t *handle_entry = &process_filehandle_table[filehandle - 3];
         if (handle_entry->in_use && handle_entry->owner == thread_get_current_process()) {
+            lock_release(process_filehandle_lock);
             result = vfs_write(handle_entry->vfs_handle, kernel_buffer, n);
         } else {
+            lock_release(process_filehandle_lock);
             result = -1;
         }
-        lock_release(process_filehandle_lock);
     } else {
         result = -1;
     }

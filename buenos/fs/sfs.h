@@ -14,6 +14,10 @@
 /* Magic number found on each sfs filesystem's header block. */
 #define SFS_MAGIC 1337
 
+/* Max concurrent readers permitted to jile access */
+#define SFS_MAX_READERS 64
+#define SFS_MAX_OPEN_FILES 64
+
 /* Names are limited to 16 characters */
 #define SFS_VOLUMENAME_MAX 16
 #define SFS_FILENAME_MAX 16
