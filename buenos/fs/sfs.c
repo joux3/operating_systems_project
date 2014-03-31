@@ -352,6 +352,7 @@ int sfs_open(fs_t *fs, char *filename) {
     index = -1;
     //find if file is already open
     index = sfs_find_open_file(sfs, file_inode);
+    DEBUG("sfsdebug", "SFS_open: file %s open in index %d\n", filename, index);
     //file not open so initialize new open file
     if(index < 0) {
         for(i = 0; i < SFS_MAX_OPEN_FILES; i++) {
@@ -360,6 +361,7 @@ int sfs_open(fs_t *fs, char *filename) {
                 break;
             }
         }
+	DEBUG("sfsdebug", "SFS_open: file %s not yet opening at index %d\n", filename, index);
         //no open spots found
         if(index < 0) 
             goto error;
@@ -380,10 +382,12 @@ int sfs_open(fs_t *fs, char *filename) {
     }
     sfs->open_files[index].open_count++;
     lock_release(sfs->lock);
+    DEBUG("sfsdebug", "SFS_open: file %s opened successfully\n", filename);
     return index;
 
     error:
     lock_release(sfs->lock);
+    DEBUG("sfsdebug", "SFS_open: file %s open failed\n", filename);
     return VFS_ERROR;
 }
 
@@ -829,10 +833,13 @@ int sfs_read(fs_t *fs, int fileid, void *buffer, int bufsize, int offset)
     semaphore_P(f->sem);
 
     // currently file id points to the file block, so validate it
-    if (fileid <= (int)sfs->bab_count || fileid >= (int)sfs->block_count) {
+
+    /* TODO check this
+    if (f->file_block <= (int)sfs->bab_count || f->file_block >= (int)sfs->block_count) {
         semaphore_V(f->sem);
         return VFS_ERROR;
     }
+    */
 
     uint32_t addr = pagepool_get_phys_page();
     if (addr == 0) {
@@ -852,7 +859,7 @@ int sfs_read(fs_t *fs, int fileid, void *buffer, int bufsize, int offset)
     indirect3 = indirect3;
     raw_buffer = raw_buffer;
 
-    if (sfs_read_block(sfs, fileid, inode) == 0)
+    if (sfs_read_block(sfs, f->file_block, inode) == 0)
         goto error; 
     if (offset < 0 || offset > (int)inode->file.filesize) 
         goto error;
@@ -943,7 +950,9 @@ int sfs_write(fs_t *fs, int fileid, void *buffer, int datasize, int offset)
     int retval = 0;
     sfs_t *sfs = fs->internal;
     
+    DEBUG("sfsdebug", "SFS_open: file with handle %d start to write\n", fileid);
     sfs_open_file_t* f = &(sfs->open_files[fileid]);
+    DEBUG("sfsdebug", "SFS_open: file with handle %d open_count %d\n", fileid, f->open_count);
     //lock this up so that only one thread can access the semaphore
     lock_acquire(f->lock);
     //starve all the readers out
@@ -974,7 +983,7 @@ int sfs_write(fs_t *fs, int fileid, void *buffer, int datasize, int offset)
     indirect2 = indirect2;
     indirect3 = indirect3;
 
-    if (sfs_read_block(sfs, fileid, inode) == 0) {
+    if (sfs_read_block(sfs, f->file_block, inode) == 0) {
         retval = VFS_ERROR;
         goto exit1;
     }
