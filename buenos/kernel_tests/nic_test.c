@@ -8,12 +8,13 @@
 #include "net/pop.h"
 #include "kernel/assert.h"
 
-#define POP_PROTOCOL 0x01
+#define POP_PROTOCOL    0x01
+#define SOCKETS         1
 
-sock_t send_socket;
-sock_t recv_socket;
-uint16_t sport;
-uint16_t rport;
+sock_t send_sockets[SOCKETS];
+sock_t recv_sockets[SOCKETS];
+uint16_t sports[SOCKETS];
+uint16_t rports[SOCKETS];
 network_address_t addr;
 
 void send_thread(uint32_t param) {
@@ -21,11 +22,15 @@ void send_thread(uint32_t param) {
     void *buffer = &send_data;
     int send_length = sizeof(int);
     param++;
+    int i;
     while (1) {
-        kprintf("Sending from socket %d to addr %x\n", send_socket, addr);
-        kprintf("Sending data %d\n", send_data++);
-        socket_sendto(send_socket, addr, rport, buffer, send_length);
-        thread_sleep(5000);
+        for (i = 0; i < SOCKETS; i++) {
+            //kprintf("Sending from socket %d to addr %x\n", send_sockets[i], addr);
+            //kprintf("Sending data %d\n", send_data++);
+            socket_sendto(send_sockets[i], addr, rports[i], buffer, send_length);
+            thread_switch();
+            thread_sleep(500);
+        }
     }
 }
 
@@ -36,23 +41,33 @@ void recv_thread(uint32_t param) {
     network_address_t sender_addr;
     void* buffer = &recv_data;
     int max_length = sizeof(int);
+    int i;
     while (1) {
-        kprintf("receiving from socket %d\n", recv_socket);
-        socket_recvfrom(recv_socket, &sender_addr, &sport, buffer, max_length, &received_bytes);
-        kprintf("Reciefed the following things:\n");
-        kprintf("Message from address %x\n", sender_addr);
-        kprintf("Message content %d\n", recv_data);
-        thread_sleep(5000);
+        for (i = 0; i < SOCKETS; i++) {
+            //kprintf("receiving from socket %d\n", recv_sockets[i]);
+            socket_recvfrom(recv_sockets[i], &sender_addr, &sports[i],
+                            buffer, max_length, &received_bytes);
+            //kprintf("Recieved the following things:\n");
+            //kprintf("Message from address %x\n", sender_addr);
+            //kprintf("Message content %d\n", recv_data);
+            thread_switch();
+            thread_sleep(500);
+        }
     }
 }
 
 void nic_test_main(void) {
     addr = 0x0f01beef;
-    sport = 1;
-    rport = 2;
-    send_socket = socket_open(POP_PROTOCOL, sport);
-    recv_socket = socket_open(POP_PROTOCOL, rport);
-    KERNEL_ASSERT(send_socket >= 0 && recv_socket >= 0);
+    int i;
+    for (i = 0; i < SOCKETS; i++) {
+        sports[i] = i + 1;
+        rports[i] = i + 1 + SOCKETS;
+        kprintf("Creating sockets for ports %d and %d\n", sports[i], rports[i]);
+        send_sockets[i] = socket_open(POP_PROTOCOL, sports[i]);
+        recv_sockets[i] = socket_open(POP_PROTOCOL, rports[i]);
+        kprintf("Created sockets %d and %d\n", send_sockets[i], recv_sockets[i]);
+        KERNEL_ASSERT(send_sockets[i] >= 0 && recv_sockets[i] >= 0);
+    }
     kprintf("Starting NIC test\n");
     TID_t thread;
     thread = thread_create(&send_thread, 1);

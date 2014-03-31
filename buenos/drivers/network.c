@@ -56,17 +56,22 @@ static void nic_interrupt_handle(device_t *device) {
     
     nic_real_device_t *real_dev = device->real_device;
     nic_io_area_t *io = (nic_io_area_t*)device->io_address;
+
+    //DEBUG("nic_test", "interrupt in NIC\n");
     
     spinlock_acquire(&real_dev->slock);
     
     if (NIC_STATUS_SIRQ(io->status)) {
+        //DEBUG("nic_test", "interrupt SIRQ\n");
         io->command = NIC_COMMAND_CLEAR_SIRQ;
         sleepq_wake(&real_dev->send_sleepq);
     }
     if (NIC_STATUS_RXIRQ(io->status)) {
+        //DEBUG("nic_test", "interrupt RXIRQ\n");
         sleepq_wake(&real_dev->recv_sleepq);
     }
     if(NIC_STATUS_RIRQ(io->status)) {
+        //DEBUG("nic_test", "interrupt RIRQ\n");
         io->command = NIC_COMMAND_CLEAR_RIRQ;
         io->command = NIC_COMMAND_CLEAR_RXBUSY;
         sleepq_wake(&real_dev->recv_done_sleepq);
@@ -77,6 +82,7 @@ static void nic_interrupt_handle(device_t *device) {
 
 static int nic_send(gnd_t *gnd, void *frame, network_address_t addr) {
     
+    DEBUG("nic_test", "entering nic_send\n");
     addr = addr; // Address is no longer needed, since we copy from
                  // buffer to buffer
 
@@ -101,10 +107,14 @@ static int nic_send(gnd_t *gnd, void *frame, network_address_t addr) {
 
     spinlock_release(&real_dev->slock);
     _interrupt_set_state(intr_status);
-    
+   
+    DEBUG("nic_test", "leaving nic_send\n");
+
     return 0;
 }
 static int nic_recv(gnd_t *gnd, void *frame) {
+
+    DEBUG("nic_test", "entering nic_recv\n");
 
     interrupt_status_t intr_status;
     nic_real_device_t *real_dev = gnd->device->real_device;
@@ -114,9 +124,11 @@ static int nic_recv(gnd_t *gnd, void *frame) {
     spinlock_acquire(&real_dev->slock);
 
     while (NIC_STATUS_RBUSY(io->status) || !NIC_STATUS_RXIRQ(io->status)) {
+        DEBUG("nic_test", "putting recv to sleep\n");
         sleepq_add(&real_dev->recv_sleepq);
         spinlock_release(&real_dev->slock);
         thread_switch();
+        DEBUG("nic_test", "recv waking\n");
         spinlock_acquire(&real_dev->slock);
     }
     
@@ -131,6 +143,8 @@ static int nic_recv(gnd_t *gnd, void *frame) {
     spinlock_release(&real_dev->slock);
     _interrupt_set_state(intr_status);
     thread_switch();
+
+    DEBUG("nic_test", "leaving nic_recv\n");
     
     return 0;
 }
