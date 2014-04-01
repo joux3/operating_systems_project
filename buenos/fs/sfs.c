@@ -902,20 +902,20 @@ error:
 
 
 // writes direct block
-int sfs_write_direct_blocks(sfs_t *sfs, void **buffer, char *raw_buffer, uint32_t *pointers, int pointer_count, int *datasize, int *offset) {
+int sfs_write_direct_blocks(sfs_t *sfs, void **buffer, char *raw_buffer, uint32_t *pointers, int pointer_count, int *datasize, int *offset, int base_offset) {
     int block, written = 0;
     for (block = 0; block < pointer_count && *datasize > 0; block++) {
-        if (*offset >= block * SFS_BLOCK_SIZE && *offset < (block + 1) * SFS_BLOCK_SIZE) {
+        if (*offset - base_offset >= block * SFS_BLOCK_SIZE && *offset - base_offset < (block + 1) * SFS_BLOCK_SIZE) {
             // write touches this block
-            if (!(*offset == block * (int)SFS_BLOCK_SIZE && *datasize >= SFS_BLOCK_SIZE)) {
+            if (!(*offset - base_offset == block * (int)SFS_BLOCK_SIZE && *datasize >= SFS_BLOCK_SIZE)) {
                 // we're not fully overwriting the block; read it first
                 DEBUG("sfsdebug", "Reading block %d before overwriting parts\n", pointers[block]);
                 if (sfs_read_block(sfs, pointers[block], raw_buffer) == 0) 
                     return -1;
             }
             // copy to the buffer
-            int in_this_block = MIN(SFS_BLOCK_SIZE - (*offset % SFS_BLOCK_SIZE), *datasize);
-            memcopy(in_this_block, raw_buffer + (*offset % SFS_BLOCK_SIZE), *buffer); 
+            int in_this_block = MIN(SFS_BLOCK_SIZE - ((*offset - base_offset) % SFS_BLOCK_SIZE), *datasize);
+            memcopy(in_this_block, raw_buffer + ((*offset - base_offset) % SFS_BLOCK_SIZE), *buffer); 
             DEBUG("sfsdebug", "Writing block %d, %d new bytes\n", pointers[block], in_this_block);
             if (sfs_write_block(sfs, pointers[block], raw_buffer) == 0) 
                 return -1;
@@ -923,6 +923,22 @@ int sfs_write_direct_blocks(sfs_t *sfs, void **buffer, char *raw_buffer, uint32_
             *datasize -= in_this_block;
             *offset += in_this_block;
             *buffer = (void*)((uint32_t)*buffer + in_this_block);
+        }
+    }
+    return written;
+}
+
+int sfs_write_indirect1_blocks(sfs_t *sfs, void **buffer, char *raw_buffer, uint32_t *pointers, int pointer_count, int *datasize, int *offset, int base_offset, uint32_t *indirect1) {
+    int block, written = 0;
+    for (block = 0; block < pointer_count && *datasize > 0; block++) {
+        if (*offset - base_offset >= block * (int)SFS_INDIRECT_POINTERS * (int)SFS_BLOCK_SIZE && *offset - base_offset < (block + 1) * (int)SFS_INDIRECT_POINTERS * (int)SFS_BLOCK_SIZE) {
+            if (sfs_read_block(sfs, pointers[block], indirect1) == 0)
+                return -1;
+    
+            int res = sfs_write_direct_blocks(sfs, buffer, raw_buffer, indirect1, SFS_INDIRECT_POINTERS, datasize, offset, base_offset + block * SFS_INDIRECT_POINTERS * SFS_BLOCK_SIZE);
+            if (res == -1)
+                return -1;
+            written += res;
         }
     }
     return written;
@@ -979,7 +995,6 @@ int sfs_write(fs_t *fs, int fileid, void *buffer, int datasize, int offset)
     uint32_t *indirect3 = (uint32_t*)(addr + sizeof(sfs_inode_t) + 2 * SFS_BLOCK_SIZE);
     char *raw_buffer    = (char*)(addr + sizeof(sfs_inode_t) + 3 * SFS_BLOCK_SIZE);
     // TODO REMOVE
-    indirect1 = indirect1;
     indirect2 = indirect2;
     indirect3 = indirect3;
 
@@ -996,9 +1011,12 @@ int sfs_write(fs_t *fs, int fileid, void *buffer, int datasize, int offset)
         goto exit1;
     }
 
-    KERNEL_ASSERT(offset + datasize <= (int)SFS_DIRECT_SIZE); // TODO, only supports direct blocks now
+    KERNEL_ASSERT(offset + datasize <= (int)SFS_FIRST_INDIRECT_SIZE); // TODO
     if (offset <= (int)SFS_DIRECT_SIZE) {
-        retval += sfs_write_direct_blocks(sfs, &buffer, raw_buffer, (uint32_t*)&(inode->file.direct_blocks), SFS_DIRECT_DATA_BLOCKS, &datasize, &offset);
+        retval += sfs_write_direct_blocks(sfs, &buffer, raw_buffer, (uint32_t*)&(inode->file.direct_blocks), SFS_DIRECT_DATA_BLOCKS, &datasize, &offset, 0);
+    }
+    if (offset <= (int)SFS_FIRST_INDIRECT_SIZE && datasize > 0) {
+        retval += sfs_write_indirect1_blocks(sfs, &buffer, raw_buffer, (uint32_t*)&(inode->file.first_indirect), 1, &datasize, &offset, (int)SFS_DIRECT_SIZE, indirect1);
     }
     KERNEL_ASSERT(datasize == 0);
     
