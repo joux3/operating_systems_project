@@ -329,8 +329,9 @@ uint32_t sfs_root_inode_for_path(sfs_t *sfs, char **path) {
                 delim_count--;
                 found_one = 1;
                 // move path forward
-                while (**path++ != '/');
-                *path += 1;
+                while ((**path) != '/')
+                    (*path) += 1;
+                (*path) += 1;
             }
         } 
         if (!found_one) {
