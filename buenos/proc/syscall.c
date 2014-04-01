@@ -49,9 +49,10 @@
 
     
     #define KERNEL_BUFFER_SIZE 256
-    #define IO_KERNEL_BUFFER_SIZE 256
 #ifdef CHANGED_3
     #define IO_KERNEL_BUFFER_SIZE 1024
+#else
+    #define IO_KERNEL_BUFFER_SIZE 256
 #endif
 
 gcd_t *syscall_get_console_gcd(void) {
