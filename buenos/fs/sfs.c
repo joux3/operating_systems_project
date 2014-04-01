@@ -900,7 +900,7 @@ int sfs_read(fs_t *fs, int fileid, void *buffer, int bufsize, int offset)
     sfs_open_file_t* f = &(sfs->open_files[fileid]);
     semaphore_P(f->sem);
 
-    DEBUG("sfsdebug", "SFS_read: offset %d, size %d\n", offset, bufsize);
+    DEBUG("sfsdebug", "SFS_read: start with offset %d, size %d open count %d\n", offset, bufsize, f->open_count);
 
     KERNEL_ASSERT(!(f->file_block <= sfs->bab_count || f->file_block >= sfs->block_count));
 
@@ -957,6 +957,7 @@ int sfs_read(fs_t *fs, int fileid, void *buffer, int bufsize, int offset)
 
 success:
     pagepool_free_phys_page(ADDR_KERNEL_TO_PHYS(addr));
+    DEBUG("sfsdebug", "SFS_read: end with offset %d,  open count %d\n", offset, f->open_count);
     semaphore_V(f->sem);
     return read;
 error:
@@ -1067,12 +1068,15 @@ int sfs_write(fs_t *fs, int fileid, void *buffer, int datasize, int offset)
     sfs_open_file_t* f = &(sfs->open_files[fileid]);
     DEBUG("sfsdebug", "SFS_write: file with handle %d open_count %d\n", fileid, f->open_count);
     //lock this up so that only one thread can access the semaphore
+    DEBUG("sfsdebug", "SFS_write: file  waiting for lock\n");
     lock_acquire(f->lock);
+    DEBUG("sfsdebug", "SFS_write: file  got lock waiting sem\n");
     //starve all the readers out
     for(i = 0; i < SFS_MAX_READERS; i++) {
         semaphore_P(f->sem);
     }
     KERNEL_ASSERT(!(f->file_block <= sfs->bab_count || f->file_block >= sfs->block_count));
+    DEBUG("sfsdebug", "SFS_write: got all readers\n");
 
     uint32_t addr = pagepool_get_phys_page();
     if (addr == 0) {
@@ -1139,9 +1143,11 @@ exit1:
     pagepool_free_phys_page(ADDR_KERNEL_TO_PHYS(addr));
 exit2:
     //free all readers 
+    DEBUG("sfsdebug", "SFS_write: DONE release the hounds(readers)\n");
     for(i = 0; i < SFS_MAX_READERS; i++) {
         semaphore_V(f->sem);
     }
+    DEBUG("sfsdebug", "SFS_write: release read lock\n");
     lock_release(f->lock);
     return retval;
 }
