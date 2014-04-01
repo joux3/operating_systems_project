@@ -863,6 +863,22 @@ int sfs_read_indirect2_blocks(sfs_t *sfs, void **buffer, char *raw_buffer, uint3
     return read;
 }
 
+int sfs_read_indirect3_blocks(sfs_t *sfs, void **buffer, char *raw_buffer, uint32_t *pointers, int pointer_count, int *bufsize, int *offset, int base_offset, uint32_t *indirect1, uint32_t *indirect2, uint32_t *indirect3) {
+    int block, read = 0;
+    for (block = 0; block < pointer_count && *bufsize > 0; block++) {
+        if (*offset - base_offset >= block * (int)SFS_INDIRECT_POINTERS * (int)SFS_INDIRECT_POINTERS * (int)SFS_INDIRECT_POINTERS * (int)SFS_BLOCK_SIZE && *offset - base_offset < (block + 1) * (int)SFS_INDIRECT_POINTERS * (int)SFS_INDIRECT_POINTERS * (int)SFS_INDIRECT_POINTERS * (int)SFS_BLOCK_SIZE) {
+            if (sfs_read_block(sfs, pointers[block], indirect3) == 0)
+                return -1;
+    
+            int res = sfs_read_indirect2_blocks(sfs, buffer, raw_buffer, indirect3, SFS_INDIRECT_POINTERS, bufsize, offset, base_offset + block * SFS_INDIRECT_POINTERS * SFS_INDIRECT_POINTERS * SFS_INDIRECT_POINTERS * SFS_BLOCK_SIZE, indirect1, indirect2);
+            if (res == -1)
+                return -1;
+            read += res;
+        }
+    }
+    return read;
+}
+
 /**
  * Reads at most bufsize bytes from file to the buffer starting from
  * the offset. bufsize bytes is always read if possible. Returns
@@ -921,7 +937,7 @@ int sfs_read(fs_t *fs, int fileid, void *buffer, int bufsize, int offset)
         goto success;
     }
 
-    KERNEL_ASSERT(offset + bufsize <= (int)SFS_SECOND_INDIRECT_SIZE); // TODO: handle error outputs
+    KERNEL_ASSERT(offset + bufsize <= (int)SFS_MAX_FILESIZE); // TODO: handle error outputs
     if (offset <= (int)SFS_DIRECT_SIZE) {
         read += sfs_read_direct_blocks(sfs, &buffer, raw_buffer, (uint32_t*)&(inode->file.direct_blocks), SFS_DIRECT_DATA_BLOCKS, &bufsize, &offset, 0);
     }
@@ -930,6 +946,9 @@ int sfs_read(fs_t *fs, int fileid, void *buffer, int bufsize, int offset)
     }
     if (offset <= (int)SFS_SECOND_INDIRECT_SIZE && bufsize > 0) {
         read += sfs_read_indirect2_blocks(sfs, &buffer, raw_buffer, (uint32_t*)&(inode->file.second_indirect), 1, &bufsize, &offset, (int)SFS_FIRST_INDIRECT_SIZE, indirect1, indirect2);
+    }
+    if (bufsize > 0) {
+        read += sfs_read_indirect3_blocks(sfs, &buffer, raw_buffer, (uint32_t*)&(inode->file.third_indirect), 1, &bufsize, &offset, (int)SFS_SECOND_INDIRECT_SIZE, indirect1, indirect2, indirect3);
     }
     KERNEL_ASSERT(bufsize == 0);
 
