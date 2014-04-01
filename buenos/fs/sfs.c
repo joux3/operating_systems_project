@@ -810,6 +810,26 @@ error:
     return VFS_ERROR;
 }
 
+int sfs_read_direct_blocks(sfs_t *sfs, void **buffer, char *raw_buffer, uint32_t *pointers, int pointer_count, int *bufsize, int *offset, int base_offset) {
+    int block;
+    int read = 0;
+    for (block = 0; block < pointer_count && *bufsize > 0; block++) {
+        if (*offset - base_offset >= block * (int)SFS_BLOCK_SIZE && *offset - base_offset < (block + 1) * (int)SFS_BLOCK_SIZE) {
+            // read touches this block
+            DEBUG("sfsdebug", "Reading block %d\n", pointers[block]);
+            if (sfs_read_block(sfs, pointers[block], raw_buffer) == 0) 
+                return -1;
+            // copy to the buffer
+            int in_this_block = MIN((int)SFS_BLOCK_SIZE - ((*offset - base_offset) % (int)SFS_BLOCK_SIZE), *bufsize);
+            memcopy(in_this_block, *buffer, raw_buffer + ((*offset - base_offset) % (int)SFS_BLOCK_SIZE)); 
+            read += in_this_block;
+            *bufsize -= in_this_block;
+            *offset += in_this_block;
+            *buffer = (void*)((uint32_t)*buffer + in_this_block);
+        }
+    }
+    return read;
+}
 
 /**
  * Reads at most bufsize bytes from file to the buffer starting from
@@ -831,6 +851,8 @@ int sfs_read(fs_t *fs, int fileid, void *buffer, int bufsize, int offset)
     sfs_t *sfs = fs->internal;
     sfs_open_file_t* f = &(sfs->open_files[fileid]);
     semaphore_P(f->sem);
+
+    DEBUG("sfsdebug", "SFS_read: offset %d, size %d\n", offset, bufsize);
 
     // currently file id points to the file block, so validate it
 
@@ -869,24 +891,9 @@ int sfs_read(fs_t *fs, int fileid, void *buffer, int bufsize, int offset)
         goto success;
     }
 
-    KERNEL_ASSERT(offset + bufsize <= (int)SFS_DIRECT_SIZE); // TODO, only supports direct blocks now
+    KERNEL_ASSERT(offset + bufsize <= (int)SFS_DIRECT_SIZE); // TODO: handle error outputs
     if (offset <= (int)SFS_DIRECT_SIZE) {
-        int block;
-        for (block = 0; block < (int)SFS_DIRECT_DATA_BLOCKS && bufsize > 0; block++) {
-            if (offset >= block * (int)SFS_BLOCK_SIZE && offset < (block + 1) * (int)SFS_BLOCK_SIZE) {
-                // read touches this block
-                DEBUG("sfsdebug", "Reading block %d\n", inode->file.direct_blocks[block]);
-                if (sfs_read_block(sfs, inode->file.direct_blocks[block], raw_buffer) == 0) 
-                    goto error;
-                // copy to the buffer
-                int in_this_block = MIN(SFS_BLOCK_SIZE - (offset % SFS_BLOCK_SIZE), bufsize);
-                memcopy(in_this_block, buffer, raw_buffer + (offset % SFS_BLOCK_SIZE)); 
-                read += in_this_block;
-                bufsize -= in_this_block;
-                offset += in_this_block;
-                buffer = (void*)((uint32_t)buffer + in_this_block);
-            }
-        }
+        read += sfs_read_direct_blocks(sfs, &buffer, raw_buffer, (uint32_t*)&(inode->file.direct_blocks), SFS_DIRECT_DATA_BLOCKS, &bufsize, &offset, 0);
     }
     KERNEL_ASSERT(bufsize == 0);
 
@@ -914,8 +921,8 @@ int sfs_write_direct_blocks(sfs_t *sfs, void **buffer, char *raw_buffer, uint32_
                     return -1;
             }
             // copy to the buffer
-            int in_this_block = MIN(SFS_BLOCK_SIZE - ((*offset - base_offset) % SFS_BLOCK_SIZE), *datasize);
-            memcopy(in_this_block, raw_buffer + ((*offset - base_offset) % SFS_BLOCK_SIZE), *buffer); 
+            int in_this_block = MIN((int)SFS_BLOCK_SIZE - ((*offset - base_offset) % (int)SFS_BLOCK_SIZE), *datasize);
+            memcopy(in_this_block, raw_buffer + ((*offset - base_offset) % (int)SFS_BLOCK_SIZE), *buffer); 
             DEBUG("sfsdebug", "Writing block %d, %d new bytes\n", pointers[block], in_this_block);
             if (sfs_write_block(sfs, pointers[block], raw_buffer) == 0) 
                 return -1;
@@ -1042,7 +1049,7 @@ int sfs_write(fs_t *fs, int fileid, void *buffer, int datasize, int offset)
         goto exit1;
     }
 
-    KERNEL_ASSERT(offset + datasize <= (int)SFS_MAX_FILESIZE);
+    KERNEL_ASSERT(offset + datasize <= (int)SFS_MAX_FILESIZE); // TODO check returns values for -1
     if (offset <= (int)SFS_DIRECT_SIZE) {
         retval += sfs_write_direct_blocks(sfs, &buffer, raw_buffer, (uint32_t*)&(inode->file.direct_blocks), SFS_DIRECT_DATA_BLOCKS, &datasize, &offset, 0);
     }
