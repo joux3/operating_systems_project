@@ -338,6 +338,33 @@ static int vfs_parse_pathname(char *pathname,
     }
     *volumebuf = '\0';
 
+    #ifdef CHANGED_3
+    int len_after_path_delim = 0;
+
+    for(i = 0; i < VFS_PATH_LENGTH; i++) {
+        *filenamebuf = *pathname;
+
+        if (*pathname == '\0') {
+            /* Empty filenames are not allowed. */
+            if(len_after_path_delim == 0)
+                return VFS_ERROR;
+            
+            return VFS_OK;
+        } else if (*pathname == '/') {
+            /* Empty filenames are not allowed. */
+            if(len_after_path_delim == 0)
+                return VFS_ERROR;
+
+            len_after_path_delim = 0;
+        } else {
+            len_after_path_delim++;
+            if (len_after_path_delim >= VFS_NAME_LENGTH) // a single path piece is too long
+                return VFS_ERROR;
+        }
+        pathname++;
+        filenamebuf++;
+    }
+    #else
     for(i = 0; i < VFS_NAME_LENGTH; i++) {
         *filenamebuf = *pathname;
         if (*pathname == '\0') {
@@ -350,6 +377,7 @@ static int vfs_parse_pathname(char *pathname,
         pathname++;
         filenamebuf++;
     }
+    #endif
     
     return VFS_ERROR;
 }
