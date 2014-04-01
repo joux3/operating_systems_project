@@ -902,14 +902,7 @@ int sfs_read(fs_t *fs, int fileid, void *buffer, int bufsize, int offset)
 
     DEBUG("sfsdebug", "SFS_read: offset %d, size %d\n", offset, bufsize);
 
-    // currently file id points to the file block, so validate it
-
-    /* TODO check this
-    if (f->file_block <= (int)sfs->bab_count || f->file_block >= (int)sfs->block_count) {
-        semaphore_V(f->sem);
-        return VFS_ERROR;
-    }
-    */
+    KERNEL_ASSERT(!(f->file_block <= sfs->bab_count || f->file_block >= sfs->block_count));
 
     uint32_t addr = pagepool_get_phys_page();
     if (addr == 0) {
@@ -923,9 +916,6 @@ int sfs_read(fs_t *fs, int fileid, void *buffer, int bufsize, int offset)
     uint32_t *indirect3 = (uint32_t*)(addr + sizeof(sfs_inode_t) + 2 * SFS_BLOCK_SIZE);
     char *raw_buffer    = (char*)(addr + sizeof(sfs_inode_t) + 3 * SFS_BLOCK_SIZE);
     int read = 0;
-    // TODO REMOVE
-    indirect3 = indirect3;
-    raw_buffer = raw_buffer;
 
     if (sfs_read_block(sfs, f->file_block, inode) == 0)
         goto error; 
@@ -937,18 +927,31 @@ int sfs_read(fs_t *fs, int fileid, void *buffer, int bufsize, int offset)
         goto success;
     }
 
-    KERNEL_ASSERT(offset + bufsize <= (int)SFS_MAX_FILESIZE); // TODO: handle error outputs
+    KERNEL_ASSERT(offset + bufsize <= (int)SFS_MAX_FILESIZE); 
+    int tmp;
     if (offset <= (int)SFS_DIRECT_SIZE) {
-        read += sfs_read_direct_blocks(sfs, &buffer, raw_buffer, (uint32_t*)&(inode->file.direct_blocks), SFS_DIRECT_DATA_BLOCKS, &bufsize, &offset, 0);
+        tmp = sfs_read_direct_blocks(sfs, &buffer, raw_buffer, (uint32_t*)&(inode->file.direct_blocks), SFS_DIRECT_DATA_BLOCKS, &bufsize, &offset, 0);
+        if (tmp == -1)
+            goto error;
+        read += tmp;
     }
     if (offset <= (int)SFS_FIRST_INDIRECT_SIZE && bufsize > 0) {
-        read += sfs_read_indirect1_blocks(sfs, &buffer, raw_buffer, (uint32_t*)&(inode->file.first_indirect), 1, &bufsize, &offset, (int)SFS_DIRECT_SIZE, indirect1);
+        tmp = sfs_read_indirect1_blocks(sfs, &buffer, raw_buffer, (uint32_t*)&(inode->file.first_indirect), 1, &bufsize, &offset, (int)SFS_DIRECT_SIZE, indirect1);
+        if (tmp == -1)
+            goto error;
+        read += tmp;
     }
     if (offset <= (int)SFS_SECOND_INDIRECT_SIZE && bufsize > 0) {
-        read += sfs_read_indirect2_blocks(sfs, &buffer, raw_buffer, (uint32_t*)&(inode->file.second_indirect), 1, &bufsize, &offset, (int)SFS_FIRST_INDIRECT_SIZE, indirect1, indirect2);
+        tmp = sfs_read_indirect2_blocks(sfs, &buffer, raw_buffer, (uint32_t*)&(inode->file.second_indirect), 1, &bufsize, &offset, (int)SFS_FIRST_INDIRECT_SIZE, indirect1, indirect2);
+        if (tmp == -1)
+            goto error;
+        read += tmp;
     }
     if (bufsize > 0) {
-        read += sfs_read_indirect3_blocks(sfs, &buffer, raw_buffer, (uint32_t*)&(inode->file.third_indirect), 1, &bufsize, &offset, (int)SFS_SECOND_INDIRECT_SIZE, indirect1, indirect2, indirect3);
+        tmp = sfs_read_indirect3_blocks(sfs, &buffer, raw_buffer, (uint32_t*)&(inode->file.third_indirect), 1, &bufsize, &offset, (int)SFS_SECOND_INDIRECT_SIZE, indirect1, indirect2, indirect3);
+        if (tmp == -1)
+            goto error;
+        read += tmp;
     }
     KERNEL_ASSERT(bufsize == 0);
 
@@ -1069,13 +1072,7 @@ int sfs_write(fs_t *fs, int fileid, void *buffer, int datasize, int offset)
     for(i = 0; i < SFS_MAX_READERS; i++) {
         semaphore_P(f->sem);
     }
-    // currently file id points to the file block, so validate it
-    /* TODO is this necessary?
-    if (f->file_block <= (int)sfs->bab_count || f->file_block >= (int)sfs->block_count) {
-        retval = VFS_ERROR;
-        goto exit2;
-    }
-    */
+    KERNEL_ASSERT(!(f->file_block <= sfs->bab_count || f->file_block >= sfs->block_count));
 
     uint32_t addr = pagepool_get_phys_page();
     if (addr == 0) {
@@ -1102,18 +1099,39 @@ int sfs_write(fs_t *fs, int fileid, void *buffer, int datasize, int offset)
         goto exit1;
     }
 
-    KERNEL_ASSERT(offset + datasize <= (int)SFS_MAX_FILESIZE); // TODO check returns values for -1
+    KERNEL_ASSERT(offset + datasize <= (int)SFS_MAX_FILESIZE);
+    int tmp;
     if (offset <= (int)SFS_DIRECT_SIZE) {
-        retval += sfs_write_direct_blocks(sfs, &buffer, raw_buffer, (uint32_t*)&(inode->file.direct_blocks), SFS_DIRECT_DATA_BLOCKS, &datasize, &offset, 0);
+        tmp = sfs_write_direct_blocks(sfs, &buffer, raw_buffer, (uint32_t*)&(inode->file.direct_blocks), SFS_DIRECT_DATA_BLOCKS, &datasize, &offset, 0);
+        if (tmp == -1) {
+            retval = VFS_ERROR;
+            goto exit1;
+        }
+        retval += tmp;
     }
     if (offset <= (int)SFS_FIRST_INDIRECT_SIZE && datasize > 0) {
-        retval += sfs_write_indirect1_blocks(sfs, &buffer, raw_buffer, (uint32_t*)&(inode->file.first_indirect), 1, &datasize, &offset, (int)SFS_DIRECT_SIZE, indirect1);
+        tmp = sfs_write_indirect1_blocks(sfs, &buffer, raw_buffer, (uint32_t*)&(inode->file.first_indirect), 1, &datasize, &offset, (int)SFS_DIRECT_SIZE, indirect1);
+        if (tmp == -1) {
+            retval = VFS_ERROR;
+            goto exit1;
+        }
+        retval += tmp;
     }
     if (offset <= (int)SFS_SECOND_INDIRECT_SIZE && datasize > 0) {
-        retval += sfs_write_indirect2_blocks(sfs, &buffer, raw_buffer, (uint32_t*)&(inode->file.second_indirect), 1, &datasize, &offset, (int)SFS_FIRST_INDIRECT_SIZE, indirect1, indirect2);
+        tmp = sfs_write_indirect2_blocks(sfs, &buffer, raw_buffer, (uint32_t*)&(inode->file.second_indirect), 1, &datasize, &offset, (int)SFS_FIRST_INDIRECT_SIZE, indirect1, indirect2);
+        if (tmp == -1) {
+            retval = VFS_ERROR;
+            goto exit1;
+        }
+        retval += tmp;
     }
     if (datasize > 0) {
-        retval += sfs_write_indirect3_blocks(sfs, &buffer, raw_buffer, (uint32_t*)&(inode->file.third_indirect), 1, &datasize, &offset, (int)SFS_SECOND_INDIRECT_SIZE, indirect1, indirect2, indirect3);
+        tmp = sfs_write_indirect3_blocks(sfs, &buffer, raw_buffer, (uint32_t*)&(inode->file.third_indirect), 1, &datasize, &offset, (int)SFS_SECOND_INDIRECT_SIZE, indirect1, indirect2, indirect3);
+        if (tmp == -1) {
+            retval = VFS_ERROR;
+            goto exit1;
+        }
+        retval += tmp;
     }
     KERNEL_ASSERT(datasize == 0);
     
