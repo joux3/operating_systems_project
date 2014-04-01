@@ -280,15 +280,81 @@ int sfs_unmount(fs_t *fs)
     return VFS_OK;
 }
 
+// like stringcmp but treats / as \0 too
+int sfs_path_stringcmp(const char *str1, const char *str2) {
+    while(1) {
+        if ((*str1 == '\0' || *str1 == '/') && (*str2 == '\0' || *str2 == '/'))
+            return 0;
+        if ((*str1 == '\0' || *str1 == '/') || (*str2 == '\0' || *str2 == '/') ||
+            *str1 != *str2)
+            return *str1-*str2;
+
+        str1++;
+        str2++;
+    }
+
+    /* Dummy return to keep gcc happy */
+    return 0; 
+}
+
+// travelses directories until path doesn't contain / or an intermediate dir wasn't found
+// also modifies the passed **path so that extra parsing isn't necessary
+uint32_t sfs_root_inode_for_path(sfs_t *sfs, char **path) {
+    uint32_t cur_dir_block = sfs_root_inode(sfs);
+    int i, delim_count = 0;
+    sfs_inode_dir_t *dir_inode;
+    DEBUG("sfsdebug", "finding root inode for path %s\n", *path);
+    for (i = 0; i < VFS_PATH_LENGTH; i++) {
+        if ((*path)[i] == '/')
+            delim_count++;
+    }
+    while (delim_count > 0) {
+        if (sfs_read_block(sfs, cur_dir_block, &(sfs->inode.buffer)) == 0) 
+            return 0;
+        if (sfs->inode.node.inode_type != SFS_DIR_INODE) {
+            kprintf("SFS: inode should be dir but isn't! inode %d\n", cur_dir_block);
+            KERNEL_PANIC("SFS: corrupted filesystem!\n");
+        }
+        
+        int found_one = 0;
+        dir_inode = &(sfs->inode.node.dir);
+        for (i = 0; i < (int)SFS_ENTRIES_PER_DIR; i++) {
+            if (dir_inode->entries[i].inode > 0 && sfs_path_stringcmp(dir_inode->entries[i].name, *path) == 0) {
+                uint32_t dir_block = dir_inode->entries[i].inode;
+                // check that the inode is actually a dir inode, it might be a file
+                if (sfs_read_block(sfs, dir_block, &(sfs->inode.buffer)) == 0 || sfs->inode.node.inode_type != SFS_DIR_INODE)
+                    return 0;
+                DEBUG("sfsdebug", "    found from %d\n", dir_block);
+                cur_dir_block = dir_block;
+                delim_count--;
+                found_one = 1;
+                // move path forward
+                while (**path++ != '/');
+                *path += 1;
+            }
+        } 
+        if (!found_one) {
+            if (dir_inode->next_dir_inode == 0) {
+                return 0;
+            } else {
+                cur_dir_block = dir_inode->next_dir_inode;
+            }
+        }
+    }
+
+    return cur_dir_block;
+}
+
+
 // returns:
 // - the file inode block number if found
 // - 0 if not found
-uint32_t sfs_find_file_and_dir(sfs_t *sfs, char *filename, uint32_t *dir_block) 
+uint32_t sfs_find_file_and_dir(sfs_t *sfs, char **filename, uint32_t *dir_block) 
 {
     int r;
     uint32_t cur_dir_block, i;
     sfs_inode_dir_t *dir_inode;
-    cur_dir_block = sfs_root_inode(sfs); 
+    cur_dir_block = sfs_root_inode_for_path(sfs, filename); 
     while (1) {
         r = sfs_read_block(sfs, cur_dir_block, &(sfs->inode.buffer));
         if (r == 0) {
@@ -300,7 +366,7 @@ uint32_t sfs_find_file_and_dir(sfs_t *sfs, char *filename, uint32_t *dir_block)
         }
         dir_inode = &(sfs->inode.node.dir);
         for (i = 0; i < SFS_ENTRIES_PER_DIR; i++) {
-            if (dir_inode->entries[i].inode > 0 && stringcmp(dir_inode->entries[i].name, filename) == 0) {
+            if (dir_inode->entries[i].inode > 0 && stringcmp(dir_inode->entries[i].name, *filename) == 0) {
                 if (dir_block != NULL)
                     *dir_block = cur_dir_block;
                 uint32_t file_block = dir_inode->entries[i].inode;
@@ -318,7 +384,7 @@ uint32_t sfs_find_file_and_dir(sfs_t *sfs, char *filename, uint32_t *dir_block)
     }
 }
 
-uint32_t sfs_find_file(sfs_t *sfs, char *filename) {
+uint32_t sfs_find_file(sfs_t *sfs, char **filename) {
     return sfs_find_file_and_dir(sfs, filename, NULL);
 }
 
@@ -347,7 +413,7 @@ int sfs_open(fs_t *fs, char *filename) {
     sfs_t *sfs = fs->internal;
     int i, index;
     lock_acquire(sfs->lock);
-    uint32_t file_inode = sfs_find_file(sfs, filename);
+    uint32_t file_inode = sfs_find_file(sfs, &filename);
     DEBUG("sfsdebug", "SFS_open: file block %d, name %s\n", file_inode, filename);
     if (file_inode == 0)
         goto error; 
@@ -776,7 +842,7 @@ int sfs_remove(fs_t *fs, char *filename)
     lock_acquire(sfs->lock);
 
     uint32_t dir_block;
-    uint32_t file_block = sfs_find_file_and_dir(sfs, filename, &dir_block);
+    uint32_t file_block = sfs_find_file_and_dir(sfs, &filename, &dir_block);
     if (file_block == 0)
         goto error;
     
