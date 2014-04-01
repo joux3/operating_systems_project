@@ -217,6 +217,12 @@ int tfs_open(fs_t *fs, char *filename)
     uint32_t i;
     int r;
 
+    #ifdef CHANGED_3
+    if (strlen(filename) >= TFS_FILENAME_MAX) {
+        return VFS_ERROR;
+    }
+    #endif
+
     tfs = (tfs_t *)fs->internal;
 
     semaphore_P(tfs->lock);
@@ -282,6 +288,12 @@ int tfs_create(fs_t *fs, char *filename, int size)
     uint32_t numblocks = (size + TFS_BLOCK_SIZE - 1)/TFS_BLOCK_SIZE; 
     int index = -1;
     int r;
+
+    #ifdef CHANGED_3
+    if (strlen(filename) >= TFS_FILENAME_MAX) {
+        return VFS_ERROR;
+    }
+    #endif
 
     semaphore_P(tfs->lock);
 
@@ -426,6 +438,12 @@ int tfs_remove(fs_t *fs, char *filename)
     uint32_t i;
     int index = -1;
     int r;
+
+    #ifdef CHANGED_3
+    if (strlen(filename) >= TFS_FILENAME_MAX) {
+        return VFS_ERROR;
+    }
+    #endif
 
     semaphore_P(tfs->lock);
 
