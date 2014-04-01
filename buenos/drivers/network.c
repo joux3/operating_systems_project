@@ -57,7 +57,7 @@ static void nic_interrupt_handle(device_t *device) {
     nic_real_device_t *real_dev = device->real_device;
     nic_io_area_t *io = (nic_io_area_t*)device->io_address;
 
-    //DEBUG("nic_test", "interrupt in NIC\n");
+    DEBUG("nic_test", "interrupt in NIC\n");
     
     spinlock_acquire(&real_dev->slock);
     
@@ -67,7 +67,7 @@ static void nic_interrupt_handle(device_t *device) {
         sleepq_wake(&real_dev->send_sleepq);
     }
     if (NIC_STATUS_RXIRQ(io->status)) {
-        //DEBUG("nic_test", "interrupt RXIRQ\n");
+        DEBUG("nic_test", "interrupt RXIRQ\n");
         sleepq_wake(&real_dev->recv_sleepq);
     }
     if(NIC_STATUS_RIRQ(io->status)) {
@@ -94,9 +94,11 @@ static int nic_send(gnd_t *gnd, void *frame, network_address_t addr) {
     spinlock_acquire(&real_dev->slock);
 
     while (NIC_STATUS_SBUSY(io->status)) {
+        DEBUG("nic_test", "putting send to sleep in nic send\n");
         sleepq_add(&real_dev->send_sleepq);
         spinlock_release(&real_dev->slock);
         thread_switch();
+        DEBUG("nic_test", "waking up in nic_send\n");
         spinlock_acquire(&real_dev->slock);
     }
     
@@ -138,6 +140,7 @@ static int nic_recv(gnd_t *gnd, void *frame) {
     if (NIC_STATUS_EBUSY(io->status) || NIC_STATUS_ERROR(io->status))
         KERNEL_PANIC("Failed at NIC recv");
 
+    DEBUG("nic_test", "putting recv to recv_done sleep queue\n");
     sleepq_add(&real_dev->recv_done_sleepq);
 
     spinlock_release(&real_dev->slock);

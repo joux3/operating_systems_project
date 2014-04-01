@@ -20,18 +20,18 @@
 #define NIC_COMMAND_ENTER_PROM      0x07
 #define NIC_COMMAND_EXIT_PROM       0x08
 
-#define NIC_STATUS_RXBUSY(status)  ((status) & 0x00000001)
-#define NIC_STATUS_RBUSY(status)  ((status) & 0x000000002)
-#define NIC_STATUS_SBUSY(status)  ((status) & 0x00000004)
-#define NIC_STATUS_RXIRQ(status)  ((status) & 0x00000008)
-#define NIC_STATUS_RIRQ(status)  ((status) & 0x00000010)
-#define NIC_STATUS_SIRQ(status)  ((status) & 0x00000020)
-#define NIC_STATUS_PROM(status)  ((status) & 0x00000040)
+#define NIC_STATUS_RXBUSY(status)   ((status) & 0x00000001)
+#define NIC_STATUS_RBUSY(status)    ((status) & 0x00000002)
+#define NIC_STATUS_SBUSY(status)    ((status) & 0x00000004)
+#define NIC_STATUS_RXIRQ(status)    ((status) & 0x00000008)
+#define NIC_STATUS_RIRQ(status)     ((status) & 0x00000010)
+#define NIC_STATUS_SIRQ(status)     ((status) & 0x00000020)
+#define NIC_STATUS_PROM(status)     ((status) & 0x00000040)
 #define NIC_STATUS_NOFRAME(status)  ((status) & 0x08000000)
-#define NIC_STATUS_IADDR(status)  ((status) & 0x10000000)
-#define NIC_STATUS_ICOMM(status)  ((status) & 0x20000000)
-#define NIC_STATUS_EBUSY(status)  ((status) & 0x40000000)
-#define NIC_STATUS_ERROR(status)  ((status) & 0x80000000)
+#define NIC_STATUS_IADDR(status)    ((status) & 0x10000000)
+#define NIC_STATUS_ICOMM(status)    ((status) & 0x20000000)
+#define NIC_STATUS_EBUSY(status)    ((status) & 0x40000000)
+#define NIC_STATUS_ERROR(status)    ((status) & 0x80000000)
 
 typedef struct {
     volatile uint32_t status;

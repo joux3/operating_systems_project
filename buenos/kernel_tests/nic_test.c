@@ -22,30 +22,32 @@ void send_thread(uint32_t param) {
     void *buffer = &send_data;
     int send_length = sizeof(int);
     param++;
-    int i;
-    while (1) {
+    int i, j = 0;
+    while (j < 10) {
         for (i = 0; i < SOCKETS; i++) {
-            //kprintf("Sending from socket %d to addr %x\n", send_sockets[i], addr);
+            kprintf("Sending from socket %d to addr %x\n", send_sockets[i], addr);
             //kprintf("Sending data %d\n", send_data++);
             socket_sendto(send_sockets[i], addr, rports[i], buffer, send_length);
             thread_switch();
             thread_sleep(500);
         }
     }
+    kprintf("finished sending\n");
 }
 
 void recv_thread(uint32_t param) {
     param++;
     int recv_data;
     int received_bytes;
+    uint16_t sport;
     network_address_t sender_addr;
     void* buffer = &recv_data;
     int max_length = sizeof(int);
-    int i;
-    while (1) {
+    int i, j = 0;
+    while (j < 10) {
         for (i = 0; i < SOCKETS; i++) {
-            //kprintf("receiving from socket %d\n", recv_sockets[i]);
-            socket_recvfrom(recv_sockets[i], &sender_addr, &sports[i],
+            kprintf("receiving from socket %d\n", recv_sockets[i]);
+            socket_recvfrom(recv_sockets[i], &sender_addr, &sport,
                             buffer, max_length, &received_bytes);
             //kprintf("Recieved the following things:\n");
             //kprintf("Message from address %x\n", sender_addr);
@@ -54,6 +56,7 @@ void recv_thread(uint32_t param) {
             thread_sleep(500);
         }
     }
+    kprintf("finished receiving\n");
 }
 
 void nic_test_main(void) {
