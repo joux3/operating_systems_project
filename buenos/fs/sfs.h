@@ -15,7 +15,7 @@
 #define SFS_MAGIC 1337
 
 /* Max concurrent readers permitted to jile access */
-#define SFS_MAX_READERS 64
+#define SFS_MAX_READERS 32
 #define SFS_MAX_OPEN_FILES 64
 
 /* Names are limited to 16 characters */

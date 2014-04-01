@@ -18,7 +18,7 @@ char buffer[MAX_BLOCK_SIZE];
 
 int main(int argc, char **argv) {
     if (argc < 5) {
-        prints("Usage: fscnctest  <filename> <filesize> <blocksize> <n_proc> \n");
+        prints("Usage: fscnctest  <filename> <filesize> <n_big> <n_small> \n");
         return 1;
     } 
 
@@ -28,30 +28,39 @@ int main(int argc, char **argv) {
 
     int pid;
     char retval_buf[12];
+    int n_big = atoi(argv[3]);
+    int n_small = atoi(argv[4]);
     
     argv[0] = READ_TEST;
-    pid = syscall_execp(READ_TEST, 3, (const char**)argv );
-    if (pid < 0) {
-        prints("failed to start process: "); 
-        itoa(pid, retval_buf);
-        prints(retval_buf);
-    } else {
-        prints("started process "); 
-        itoa(pid, retval_buf);
-        prints(retval_buf);
-        prints(" in background"); 
+    int i;
+    for(i = 0; i < n_big; i++)
+    {
+        pid = syscall_execp(READ_TEST, 3, (const char**)argv );
+        if (pid < 0) {
+            prints("failed to start process: "); 
+            itoa(pid, retval_buf);
+            prints(retval_buf);
+        } else {
+            prints("started process "); 
+            itoa(pid, retval_buf);
+            prints(retval_buf);
+            prints(" in background"); 
+        }
     }
-    argv[2] = SMALL_FILESIZE;
-    pid = syscall_execp(READ_TEST, 3, (const char**)argv );
-    if (pid < 0) {
-        prints("failed to start process: "); 
-        itoa(pid, retval_buf);
-        prints(retval_buf);
-    } else {
-        prints("started process "); 
-        itoa(pid, retval_buf);
-        prints(retval_buf);
-        prints(" in background"); 
+    //argv[2] = SMALL_FILESIZE;
+    for(i = 0; i < n_small; i++)
+    {
+        pid = syscall_execp(WRITE_TEST, 3, (const char**)argv );
+        if (pid < 0) {
+            prints("failed to start process: "); 
+            itoa(pid, retval_buf);
+            prints(retval_buf);
+        } else {
+            prints("started process "); 
+            itoa(pid, retval_buf);
+            prints(retval_buf);
+            prints(" in background"); 
+        }
     }
     return 0;
 }

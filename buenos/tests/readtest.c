@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
     filehandle = syscall_open(argv[1]);
     if (filehandle > 0) {
         while(total < n && (read = syscall_read(filehandle, buffer, to_read)) > 0) {
-            syscall_write(stdout, buffer, read);
+            //syscall_write(stdout, buffer, read);
             total += read;
             to_read = n - total  > BUFSIZE ? BUFSIZE : n - total;
         }

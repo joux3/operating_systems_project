@@ -12,14 +12,15 @@ char char_for_pos(int pos) {
 char buffer[MAX_BLOCK_SIZE];
 
 int main(int argc, char **argv) {
-    if (argc < 4) {
-        prints("Usage: fstest <filename> <filesize> <blocksize>\n");
+    if (argc < 3) {
+        prints("Usage: fstest <filename> <n>\n");
         return 1;
     } 
 
+    int blocksize = MAX_BLOCK_SIZE;
+
     char *filename = argv[1];
     int filesize = atoi(argv[2]);
-    int blocksize = atoi(argv[3]);
     if (blocksize > MAX_BLOCK_SIZE) {
         prints("Blocksize must be smaller!\n");
         return 1;
