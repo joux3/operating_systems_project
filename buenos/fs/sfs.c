@@ -361,7 +361,7 @@ int sfs_open(fs_t *fs, char *filename) {
                 break;
             }
         }
-	DEBUG("sfsdebug", "SFS_open: file %s not yet opening at index %d\n", filename, index);
+        DEBUG("sfsdebug", "SFS_open: file %s not yet opening at index %d\n", filename, index);
         //no open spots found
         if(index < 0) 
             goto error;
@@ -738,7 +738,7 @@ int sfs_close(fs_t *fs, int fileid)
     if(f->is_deleted && f->open_count == 0) {
         if(sfs_free_file_blocks(sfs, f->file_block) == 0) {
             lock_release(sfs->lock);
-            return VFS_ERROR;	
+            return VFS_ERROR;        
         }
         sfs_write_bab_cache(sfs);
 
