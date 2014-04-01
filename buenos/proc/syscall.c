@@ -49,6 +49,10 @@
 
     
     #define KERNEL_BUFFER_SIZE 256
+    #define IO_KERNEL_BUFFER_SIZE 256
+#ifdef CHANGED_3
+    #define IO_KERNEL_BUFFER_SIZE 1024
+#endif
 
 gcd_t *syscall_get_console_gcd(void) {
     // get first device (index 0) of type console
@@ -191,10 +195,10 @@ int seek_file(int filehandle, int pos) {
 
 int read_from_handle(int filehandle, void* buffer, int length) {
     int result, n;
-    uint8_t kernel_buffer[KERNEL_BUFFER_SIZE];
+    uint8_t kernel_buffer[IO_KERNEL_BUFFER_SIZE];
     gcd_t *console;
 
-    length = length < KERNEL_BUFFER_SIZE ? length : KERNEL_BUFFER_SIZE;
+    length = length < IO_KERNEL_BUFFER_SIZE ? length : IO_KERNEL_BUFFER_SIZE;
 
     if (filehandle == FILEHANDLE_STDOUT || filehandle == FILEHANDLE_STDERR) {
         result = -1;
@@ -227,10 +231,10 @@ int read_from_handle(int filehandle, void* buffer, int length) {
 
 int write_to_handle(int filehandle, void* buffer, int length) {
     int result, n;
-    uint8_t kernel_buffer[KERNEL_BUFFER_SIZE];
+    uint8_t kernel_buffer[IO_KERNEL_BUFFER_SIZE];
     gcd_t *console;
 
-    n = userland_to_kernel_memcpy(buffer, kernel_buffer, length < KERNEL_BUFFER_SIZE ? length : KERNEL_BUFFER_SIZE);
+    n = userland_to_kernel_memcpy(buffer, kernel_buffer, length < IO_KERNEL_BUFFER_SIZE ? length : IO_KERNEL_BUFFER_SIZE);
     if (n < 0)
     {
         syscall_exit_process(SYSCALL_INVALID_USERLAND_POINTER);

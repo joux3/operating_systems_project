@@ -3,7 +3,7 @@
 #define MAX_BLOCK_SIZE 1024
 
 #define WRITE_TEST "[testi]writetest"
-#define READ_TEST "[testi]cat"
+#define READ_TEST "[testi]readtest"
 
 // simple test that writes filesize bytes to filename
 // in blocksize blocks
@@ -26,6 +26,7 @@ int main(int argc, char **argv) {
 
     int i, pid;
     int n_proc = atoi(argv[4]);
+    int filesize = atoi(argv[2]);
     char retval_buf[12];
     for(i = 0; i < n_proc ; i++)
     {
@@ -35,7 +36,12 @@ int main(int argc, char **argv) {
         }
         else {
             argv[0] = READ_TEST;
-            pid = syscall_execp(READ_TEST, 2, (const char**)argv );
+            char buf[24];
+            itoa(filesize, buf);
+            argv[2] = buf;
+            prints(argv[2]); 
+            pid = syscall_execp(READ_TEST, 3, (const char**)argv );
+            filesize /= 4;
         }
         if (pid < 0) {
             prints("failed to start process: "); 
