@@ -303,8 +303,11 @@ uint32_t sfs_find_file_and_dir(sfs_t *sfs, char *filename, uint32_t *dir_block)
             if (dir_inode->entries[i].inode > 0 && stringcmp(dir_inode->entries[i].name, filename) == 0) {
                 if (dir_block != NULL)
                     *dir_block = cur_dir_block;
-                // TODO: check that the inode is actually a file inode, with dir support it might be a dir
-                return dir_inode->entries[i].inode;
+                uint32_t file_block = dir_inode->entries[i].inode;
+                // check that the inode is actually a file inode, with dir support it might be a dir
+                if (sfs_read_block(sfs, file_block, &(sfs->inode.buffer)) == 0 || sfs->inode.node.inode_type != SFS_FILE_INODE)
+                    return 0;
+                return file_block;
             }
         } 
         if (dir_inode->next_dir_inode == 0) {
