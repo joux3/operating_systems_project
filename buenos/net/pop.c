@@ -48,9 +48,6 @@
 #include "drivers/metadev.h"
 #include "kernel/interrupt.h"
 
-// REMOVE AFTER DEBUGGING
-#include "lib/debug.h"
-
 /* socket data from socket.c */
 extern socket_descriptor_t open_sockets[CONFIG_MAX_OPEN_SOCKETS];
 extern semaphore_t *open_sockets_sem;
@@ -88,50 +85,43 @@ static semaphore_t *pop_service_thread_sem;
  * @return The number of bytes actually sent, or negative on error
  */
 int socket_sendto(sock_t s,
-                  network_address_t addr,
-                  uint16_t dport,
-                  void *buf,
-                  int size)
+		  network_address_t addr,
+		  uint16_t dport,
+		  void *buf,
+		  int size)
 {
     uint16_t sport;
     pop_header_t *hdr;
     int r;
-
-    DEBUG("nic_test", "entering socket_sendto\n");
 
     /* check sanity */
     KERNEL_ASSERT(s >= 0 && s < CONFIG_MAX_OPEN_SOCKETS);
 
     /* 0 is a special port and not used for communication */
     if (dport == 0)
-        return -1;
+	return -1;
 
     /* parameter sanity... */
     KERNEL_ASSERT(size >= 1 && buf != NULL);
 
     /* Limit the size to the MTU or page size */
     size = MIN(MIN((uint32_t)size, 
-                   network_get_mtu(NETWORK_BROADCAST_ADDRESS) -
-                   sizeof(pop_header_t)),
-               PAGE_SIZE - sizeof(pop_header_t));
-    
-    DEBUG("nic_test", "going to lower the open sockets sem in sendto\n");
+		   network_get_mtu(NETWORK_BROADCAST_ADDRESS) -
+		   sizeof(pop_header_t)),
+	       PAGE_SIZE - sizeof(pop_header_t));
+
     semaphore_P(open_sockets_sem);
-    DEBUG("nic_test", "lowered the open sockets sem in sendto\n");
 
     /* Check that it is a POP socket */
     if (open_sockets[s].protocol != PROTOCOL_POP) {
-        semaphore_V(open_sockets_sem);
-        DEBUG("nic_test", "leaving socket_sendto\n");
-        return -1;
+	semaphore_V(open_sockets_sem);
+	return -1;
     }
     sport = open_sockets[s].port;
 
     semaphore_V(open_sockets_sem);
 
-    DEBUG("nic_test", "going to lower pop send buffer sem\n");
     semaphore_P(pop_send_buffer_sem);
-    DEBUG("nic_test", "lowered pop send buffer sem\n");
 
     /* construct the header at the beginning of the send buffer */
     hdr = (pop_header_t *)pop_send_buffer;
@@ -141,23 +131,21 @@ int socket_sendto(sock_t s,
 
     /* Copy the payload to its place in the send buffer */
     memcopy(size,
-            (void*)((uint32_t)pop_send_buffer + sizeof(pop_header_t)),
-            buf);
+	    (void*)((uint32_t)pop_send_buffer + sizeof(pop_header_t)),
+	    buf);
 
     /* Send the packet through ALL network interfaces */
     r = network_send(NETWORK_BROADCAST_ADDRESS, /* source: don't care */
-                     addr,                      /* destination */
-                     PROTOCOL_POP,
-                     size + sizeof(pop_header_t),
-                     (void *)pop_send_buffer);
+		     addr,                      /* destination */
+		     PROTOCOL_POP,
+		     size + sizeof(pop_header_t),
+		     (void *)pop_send_buffer);
 
     /* Return value to error if send failed */
     if (r != NET_OK)
-        size = -1;
+	size = -1;
 
     semaphore_V(pop_send_buffer_sem);
-
-    DEBUG("nic_test", "leaving socket_sendto\n");
     
     return size;
 }
@@ -179,35 +167,28 @@ int socket_sendto(sock_t s,
  * @return The number of bytes received, or negative on error
  */
 int socket_recvfrom(sock_t s,
-                    network_address_t *addr,
-                    uint16_t *sport,
-                    void *buf,
-                    int buflength,
-                    int *length)
+		    network_address_t *addr,
+		    uint16_t *sport,
+		    void *buf,
+		    int buflength,
+		    int *length)
 {
-    
-    DEBUG("nic_test", "entering socket_recvfrom\n");
 
     /* check parameter sanity */
     KERNEL_ASSERT(s >= 0 && s < CONFIG_MAX_OPEN_SOCKETS);
     
     KERNEL_ASSERT(buflength >= 1 && buf != NULL && addr != NULL && 
-                  sport != NULL && length != NULL);
-
-    DEBUG("nic_test", "going to lower the open_sockets_sem\n");
+		  sport != NULL && length != NULL);
 
     semaphore_P(open_sockets_sem);
-
-    DEBUG("nic_test", "lowered the open_sockets_sem\n");
 
     /* either no POP socket or another recvfrom already in progress
      * (no queueing implemented)
      */
     if (open_sockets[s].protocol != PROTOCOL_POP ||
-        open_sockets[s].rbuf != NULL) {
-        semaphore_V(open_sockets_sem);
-    DEBUG("nic_test", "leaving socket_recvfrom\n");
-        return -1;
+	open_sockets[s].rbuf != NULL) {
+	semaphore_V(open_sockets_sem);
+	return -1;
     }
 
     /* place the return value variables into the socket structure */
@@ -231,12 +212,7 @@ int socket_recvfrom(sock_t s,
     semaphore_V(pop_service_thread_sem);
 
     /* and wait until the packet has arrived and been copied to our buffer */
-    DEBUG("nic_test", "going to lower the open_sockets[s].receive_complete\n");
     semaphore_P(open_sockets[s].receive_complete);
-    
-    DEBUG("nic_test", "lowered the open_sockets[s].receive_complete\n");
-    
-    DEBUG("nic_test", "leaving socket_recvfrom\n");
     
     return *length;
 }
@@ -270,7 +246,7 @@ void pop_init()
     addr = pagepool_get_phys_page();
 
     if (addr == 0) {
-        KERNEL_PANIC("pop_init: page allocation failed\n");
+	KERNEL_PANIC("pop_init: page allocation failed\n");
     }
 
     pop_send_buffer = (void*)ADDR_PHYS_TO_KERNEL(addr);
@@ -281,18 +257,18 @@ void pop_init()
     pop_service_thread_sem = semaphore_create(0); /* this is a signaler */
 
     if ((pop_send_buffer_sem == NULL) || (pop_queue_sem == NULL) ||
-        (pop_service_thread_sem == NULL)) {
-        KERNEL_PANIC("pop_init: semaphore allocation failed\n");
+	(pop_service_thread_sem == NULL)) {
+	KERNEL_PANIC("pop_init: semaphore allocation failed\n");
     }
 
 
     /* zero the POP queue entries */
     for (i=0; i<CONFIG_POP_QUEUE_SIZE; i++) {
-        pop_queue[i].frame = NULL;
-        pop_queue[i].socket = -1;
-        pop_queue[i].timestamp = 0;
-        pop_queue[i].from = 0;
-        pop_queue[i].busy = 0;
+	pop_queue[i].frame = NULL;
+	pop_queue[i].socket = -1;
+	pop_queue[i].timestamp = 0;
+	pop_queue[i].from = 0;
+	pop_queue[i].busy = 0;
     }
 
     /* start the service thread (the argument is a dummy) */
@@ -318,9 +294,9 @@ void pop_init()
  * @return 1 if the frame was accepted, 0 i f not
  */
 int pop_push_frame(network_address_t fromaddr,
-                   network_address_t toaddr,
-                   uint32_t protocol_id,
-                   void *frame)
+		   network_address_t toaddr,
+		   uint32_t protocol_id,
+		   void *frame)
 {
     int i, free = -1, oldest = -1;
 
@@ -336,32 +312,32 @@ int pop_push_frame(network_address_t fromaddr,
 
     /* find a free slot or the oldest slot */
     for (i=0; i<CONFIG_POP_QUEUE_SIZE; i++) {
-        /* free slot: */
-        if (free == -1 && pop_queue[i].frame == NULL)
-            free = i;
-        
-        /* oldest nonbusy slot: */
-        if (!pop_queue[i].busy &&
-            (oldest == -1 || 
-             pop_queue[i].timestamp < pop_queue[oldest].timestamp))
-            oldest = i;
+	/* free slot: */
+	if (free == -1 && pop_queue[i].frame == NULL)
+	    free = i;
+	
+	/* oldest nonbusy slot: */
+	if (!pop_queue[i].busy &&
+	    (oldest == -1 || 
+	     pop_queue[i].timestamp < pop_queue[oldest].timestamp))
+	    oldest = i;
     }
 
     /* no free slot or the oldest slot is not old enough
      * => the packet is dropped
      */
     if (free == -1 && (oldest == -1 || 
-                       rtc_get_msec() - pop_queue[oldest].timestamp 
-                       < CONFIG_POP_QUEUE_MIN_AGE)) { /* queue full */
-        semaphore_V(pop_queue_sem);
-        return 0;
+		       rtc_get_msec() - pop_queue[oldest].timestamp 
+		       < CONFIG_POP_QUEUE_MIN_AGE)) { /* queue full */
+	semaphore_V(pop_queue_sem);
+	return 0;
     }
 
     /* use the oldest slot if no free slot was found (this is btw the
      * only way that the packets in the queue will age)
      */
     if (free == -1)
-        free = oldest;
+	free = oldest;
 
     /* set the entry values for the given frame */
     if( pop_queue[free].frame) 
@@ -404,118 +380,109 @@ static void pop_service_thread(uint32_t UNUSED dummy)
 
     /* loop the POP queue */
     while(1) {
-        DEBUG("nic_test", "running POP thread\n");
-        /* lock the queue and the socket table */
-        DEBUG("nic_test", "locking socket table\n");
-        semaphore_P(open_sockets_sem);
-        DEBUG("nic_test", "locking queue table\n");
-        semaphore_P(pop_queue_sem);
-        DEBUG("nic_test", "locked the queue and socket table\n");
-        
-        action = POP_ACTION_NONE;
+	/* lock the queue and the socket table */
+	semaphore_P(open_sockets_sem);
+	semaphore_P(pop_queue_sem);
+	
+	action = POP_ACTION_NONE;
 
-        /* find a nonempty slot in the queue */
-        for (i=0; i<CONFIG_POP_QUEUE_SIZE; i++) {
-            if (pop_queue[i].frame == NULL) continue; /* skip empty slots */
+	/* find a nonempty slot in the queue */
+	for (i=0; i<CONFIG_POP_QUEUE_SIZE; i++) {
+	    if (pop_queue[i].frame == NULL) continue; /* skip empty slots */
 
-            f = (pop_header_t*)pop_queue[i].frame;
+	    f = (pop_header_t*)pop_queue[i].frame;
 
-            /* find the recipient socket, if necessary */
-            if (pop_queue[i].socket == -1) {
-                for (j=0; j<CONFIG_MAX_OPEN_SOCKETS; j++) {
-                    if (open_sockets[j].protocol == PROTOCOL_POP &&
-                        open_sockets[j].port == f->dest_port) {
-                        pop_queue[i].socket = j;
-                        break;
-                    }
-                }
-            }
-              
+	    /* find the recipient socket, if necessary */
+	    if (pop_queue[i].socket == -1) {
+		for (j=0; j<CONFIG_MAX_OPEN_SOCKETS; j++) {
+		    if (open_sockets[j].protocol == PROTOCOL_POP &&
+			open_sockets[j].port == f->dest_port) {
+			pop_queue[i].socket = j;
+			break;
+		    }
+		}
+	    }
+  	    
             slot = i;
 
-            /* dest port not listened */
-            if (pop_queue[i].socket == -1) {
-                action = POP_ACTION_DISCARD;
-                break;
-            }
+	    /* dest port not listened */
+	    if (pop_queue[i].socket == -1) {
+		action = POP_ACTION_DISCARD;
+		break;
+	    }
 
-            /* frame has recipient socket, but it has been closed */
-            if (pop_queue[i].socket >= 0 && 
-                open_sockets[pop_queue[i].socket].protocol != PROTOCOL_POP) {
-                action = POP_ACTION_DISCARD;
-                break;
-            }
-            
-            /* someone has called recvfrom for the destination socket */
-            if (open_sockets[pop_queue[i].socket].rbuf != NULL) {
-                pop_queue[i].busy = 1; /* mark busy so it won't be touched */
-                action = POP_ACTION_TRANSFER;
-                break;
-            }
+	    /* frame has recipient socket, but it has been closed */
+	    if (pop_queue[i].socket >= 0 && 
+		open_sockets[pop_queue[i].socket].protocol != PROTOCOL_POP) {
+		action = POP_ACTION_DISCARD;
+		break;
+	    }
+	    
+	    /* someone has called recvfrom for the destination socket */
+	    if (open_sockets[pop_queue[i].socket].rbuf != NULL) {
+		pop_queue[i].busy = 1; /* mark busy so it won't be touched */
+		action = POP_ACTION_TRANSFER;
+		break;
+	    }
 
-        }
+	}
 
-        /* unlock the queue and the socket table */
-        semaphore_V(pop_queue_sem);
-        semaphore_V(open_sockets_sem);
-        DEBUG("nic_test", "freed the queue and socket table\n");
+	/* unlock the queue and the socket table */
+	semaphore_V(pop_queue_sem);
+	semaphore_V(open_sockets_sem);
 
 
-        /* the actions themselves are done here, where no locks are held */
+	/* the actions themselves are done here, where no locks are held */
 
-        /* discard the frame */
-        if (action == POP_ACTION_DISCARD) {
-            network_free_frame(f);
+	/* discard the frame */
+	if (action == POP_ACTION_DISCARD) {
+	    network_free_frame(f);
             pop_queue[slot].frame = NULL;
-        }
+	}
 
-        /* transfer frame payload to the buffer specified by the
-         * caller of recvfrom
-         */
-        if (action == POP_ACTION_TRANSFER) {
-            int bytes;
+	/* transfer frame payload to the buffer specified by the
+	 * caller of recvfrom
+	 */
+	if (action == POP_ACTION_TRANSFER) {
+	    int bytes;
 
-            /* copy the payload */
-            bytes = MIN(f->size, open_sockets[pop_queue[slot].socket].bufsize);
-            memcopy(bytes,
-                    open_sockets[pop_queue[slot].socket].rbuf,
-                    (void*)((uint32_t)f + sizeof(pop_header_t)));
+	    /* copy the payload */
+	    bytes = MIN(f->size, open_sockets[pop_queue[slot].socket].bufsize);
+	    memcopy(bytes,
+		    open_sockets[pop_queue[slot].socket].rbuf,
+		    (void*)((uint32_t)f + sizeof(pop_header_t)));
 
-            /* set return value variables */
-            *(open_sockets[pop_queue[slot].socket].sender) = pop_queue[slot].from;
-            *(open_sockets[pop_queue[slot].socket].copied) = bytes;
-            *(open_sockets[pop_queue[slot].socket].sport) = f->source_port;
-            
-            /* save the receive buffer address */
-            wake = open_sockets[pop_queue[slot].socket].rbuf;
+	    /* set return value variables */
+	    *(open_sockets[pop_queue[slot].socket].sender) = pop_queue[slot].from;
+	    *(open_sockets[pop_queue[slot].socket].copied) = bytes;
+	    *(open_sockets[pop_queue[slot].socket].sport) = f->source_port;
+	    
+	    /* save the receive buffer address */
+	    wake = open_sockets[pop_queue[slot].socket].rbuf;
 
-            /* zero the return value variables from the socket */
-            open_sockets[pop_queue[slot].socket].rbuf = NULL;
-            open_sockets[pop_queue[slot].socket].bufsize = 0;
-            open_sockets[pop_queue[slot].socket].sender = NULL;
-            open_sockets[pop_queue[slot].socket].copied = NULL;
-            open_sockets[pop_queue[slot].socket].sport = NULL;
+	    /* zero the return value variables from the socket */
+	    open_sockets[pop_queue[slot].socket].rbuf = NULL;
+	    open_sockets[pop_queue[slot].socket].bufsize = 0;
+	    open_sockets[pop_queue[slot].socket].sender = NULL;
+	    open_sockets[pop_queue[slot].socket].copied = NULL;
+	    open_sockets[pop_queue[slot].socket].sport = NULL;
 
-            /* discard the frame */
-            network_free_frame(f);
+	    /* discard the frame */
+	    network_free_frame(f);
 
-            /* wake the caller of recvfrom */
-            semaphore_V(open_sockets[pop_queue[slot].socket].receive_complete);
+	    /* wake the caller of recvfrom */
+	    semaphore_V(open_sockets[pop_queue[slot].socket].receive_complete);
 
-            /* This will mark the queue slot as free. No synch needed,
-             * since this is only one write operation. 
-             */
-            pop_queue[slot].frame = NULL;
-        }
+	    /* This will mark the queue slot as free. No synch needed,
+	     * since this is only one write operation. 
+	     */
+	    pop_queue[slot].frame = NULL;
+	}
 
-        /* only sleep if nothing was done, otherwise there may be more
-         * frames ready to be handled.
-         */
-        if (action == POP_ACTION_NONE) {
-            DEBUG("nic_test", "locking POP thread\n");
-            semaphore_P(pop_service_thread_sem);
-            DEBUG("nic_test", "unlocking POP thread\n");
-
-        }
+	/* only sleep if nothing was done, otherwise there may be more
+	 * frames ready to be handled.
+	 */
+	if (action == POP_ACTION_NONE)
+	    semaphore_P(pop_service_thread_sem);
     } /* while(1) */
 }

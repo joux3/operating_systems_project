@@ -57,21 +57,22 @@ static void nic_interrupt_handle(device_t *device) {
     nic_real_device_t *real_dev = device->real_device;
     nic_io_area_t *io = (nic_io_area_t*)device->io_address;
 
-    DEBUG("nic_test", "interrupt in NIC\n");
+    //DEBUG("nic_test", "NIC DRIVER INTERRUPT HANDLER: interrupt in NIC\n");
     
     spinlock_acquire(&real_dev->slock);
     
     if (NIC_STATUS_SIRQ(io->status)) {
-        //DEBUG("nic_test", "interrupt SIRQ\n");
+        //DEBUG("nic_test", "NIC DRIVER INTERRUPT HANDLER: interrupt SIRQ\n");
         io->command = NIC_COMMAND_CLEAR_SIRQ;
         sleepq_wake(&real_dev->send_sleepq);
     }
     if (NIC_STATUS_RXIRQ(io->status)) {
-        DEBUG("nic_test", "interrupt RXIRQ\n");
+        //DEBUG("nic_test", "NIC DRIVER INTERRUPT HANDLER: interrupt RXIRQ\n");
+        //DEBUG("nic_test", "NIC DRIVER INTERRUPT HANDLER: waking %x\n", &real_dev->recv_sleepq);
         sleepq_wake(&real_dev->recv_sleepq);
     }
     if(NIC_STATUS_RIRQ(io->status)) {
-        //DEBUG("nic_test", "interrupt RIRQ\n");
+        //DEBUG("nic_test", "NIC DRIVER INTERRUPT HANDLER: interrupt RIRQ\n");
         io->command = NIC_COMMAND_CLEAR_RIRQ;
         io->command = NIC_COMMAND_CLEAR_RXBUSY;
         sleepq_wake(&real_dev->recv_done_sleepq);
@@ -82,7 +83,7 @@ static void nic_interrupt_handle(device_t *device) {
 
 static int nic_send(gnd_t *gnd, void *frame, network_address_t addr) {
     
-    DEBUG("nic_test", "entering nic_send\n");
+    DEBUG("nic_test", "NIC DRIVER SEND: entering nic_send, sending %d to %x\n", frame, addr);
     addr = addr; // Address is no longer needed, since we copy from
                  // buffer to buffer
 
@@ -94,29 +95,29 @@ static int nic_send(gnd_t *gnd, void *frame, network_address_t addr) {
     spinlock_acquire(&real_dev->slock);
 
     while (NIC_STATUS_SBUSY(io->status)) {
-        DEBUG("nic_test", "putting send to sleep in nic send\n");
+        DEBUG("nic_test", "NIC DRIVER SEND: putting send to sleep in nic send\n");
         sleepq_add(&real_dev->send_sleepq);
         spinlock_release(&real_dev->slock);
         thread_switch();
-        DEBUG("nic_test", "waking up in nic_send\n");
+        DEBUG("nic_test", "NIC DRIVER SEND: waking up in nic_send\n");
         spinlock_acquire(&real_dev->slock);
     }
     
     io->dmaaddr = (uint32_t)frame;
     io->command = NIC_COMMAND_DMA_SEND;
     if (NIC_STATUS_EBUSY(io->status) || NIC_STATUS_ERROR(io->status))
-        KERNEL_PANIC("Failed at NIC send");
+        KERNEL_PANIC("NIC DRIVER SEND: Failed at NIC send");
 
     spinlock_release(&real_dev->slock);
     _interrupt_set_state(intr_status);
    
-    DEBUG("nic_test", "leaving nic_send\n");
+    DEBUG("nic_test", "NIC DRIVER SEND: leaving nic_send\n");
 
     return 0;
 }
 static int nic_recv(gnd_t *gnd, void *frame) {
 
-    DEBUG("nic_test", "entering nic_recv\n");
+    DEBUG("nic_test", "NIC DRIVER RECV: entering nic_recv, buffer %x, hwaddr %x\n", frame, gnd->hwaddr(gnd));
 
     interrupt_status_t intr_status;
     nic_real_device_t *real_dev = gnd->device->real_device;
@@ -126,11 +127,11 @@ static int nic_recv(gnd_t *gnd, void *frame) {
     spinlock_acquire(&real_dev->slock);
 
     while (NIC_STATUS_RBUSY(io->status) || !NIC_STATUS_RXIRQ(io->status)) {
-        DEBUG("nic_test", "putting recv to sleep\n");
+        DEBUG("nic_test", "NIC DRIVER RECV: putting recv to sleep, waiting for %x\n", &real_dev->recv_sleepq);
         sleepq_add(&real_dev->recv_sleepq);
         spinlock_release(&real_dev->slock);
         thread_switch();
-        DEBUG("nic_test", "recv waking\n");
+        DEBUG("nic_test", "NIC DRIVER RECV: recv waking, waited on was %x\n", &real_dev->recv_sleepq);
         spinlock_acquire(&real_dev->slock);
     }
     
@@ -138,16 +139,16 @@ static int nic_recv(gnd_t *gnd, void *frame) {
     io->dmaaddr = (uint32_t)frame;
     io->command = NIC_COMMAND_DMA_RECV;
     if (NIC_STATUS_EBUSY(io->status) || NIC_STATUS_ERROR(io->status))
-        KERNEL_PANIC("Failed at NIC recv");
+        KERNEL_PANIC("NIC DRIVER RECV: Failed at NIC recv");
 
-    DEBUG("nic_test", "putting recv to recv_done sleep queue\n");
+    DEBUG("nic_test", "NIC DRIVER RECV: putting recv to recv_done sleep queue\n");
     sleepq_add(&real_dev->recv_done_sleepq);
 
     spinlock_release(&real_dev->slock);
     _interrupt_set_state(intr_status);
     thread_switch();
 
-    DEBUG("nic_test", "leaving nic_recv\n");
+    DEBUG("nic_test", "NIC DRIVER RECV: leaving nic_recv\n");
     
     return 0;
 }
