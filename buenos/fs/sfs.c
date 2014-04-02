@@ -304,11 +304,13 @@ uint32_t sfs_root_inode_for_path(sfs_t *sfs, char **path, int create_intermediat
     uint32_t cur_dir_block = sfs_root_inode(sfs);
     int i, delim_count = 0, free_place_at = 0, need_to_write_bab = 0;
     sfs_inode_dir_t *dir_inode;
-    DEBUG("sfsdebug", "finding root inode for path %s\n", *path);
     for (i = 0; i < VFS_PATH_LENGTH; i++) {
         if ((*path)[i] == '/')
             delim_count++;
+        if ((*path)[i] == '\0')
+            break;
     }
+    DEBUG("sfsdebug", "finding root inode for path %s, delims %d\n", *path, delim_count);
     while (delim_count > 0) {
         if (sfs_read_block(sfs, cur_dir_block, &(sfs->inode.buffer)) == 0) 
             goto error;
@@ -328,7 +330,6 @@ uint32_t sfs_root_inode_for_path(sfs_t *sfs, char **path, int create_intermediat
                 // check that the inode is actually a dir inode, it might be a file
                 if (sfs_read_block(sfs, dir_block, &(sfs->inode.buffer)) == 0 || sfs->inode.node.inode_type != SFS_DIR_INODE)
                     goto error;
-                DEBUG("sfsdebug", "    found from %d\n", dir_block);
                 cur_dir_block = dir_block;
                 delim_count--;
                 free_place_at = 0;
@@ -337,6 +338,8 @@ uint32_t sfs_root_inode_for_path(sfs_t *sfs, char **path, int create_intermediat
                 while ((**path) != '/')
                     (*path) += 1;
                 (*path) += 1;
+                DEBUG("sfsdebug", "    found from %d, path left %s, delims %d\n", dir_block, *path, delim_count);
+                break;
             }
         } 
         if (!found_one) {
@@ -391,6 +394,7 @@ uint32_t sfs_root_inode_for_path(sfs_t *sfs, char **path, int create_intermediat
                         need_to_write_bab = 1; 
 
                     // now actually create the empty dir
+                    DEBUG("sfsdebug", "  created new dir on block %d\n", new_dir_block);
                     cur_dir_block = new_dir_block;
                     memoryset(&(sfs->inode.buffer), 0, SFS_BLOCK_SIZE);
                     sfs->inode.node.inode_type = SFS_DIR_INODE;
@@ -410,8 +414,10 @@ uint32_t sfs_root_inode_for_path(sfs_t *sfs, char **path, int create_intermediat
 
     KERNEL_ASSERT(strlen(*path) < SFS_FILENAME_MAX);
 
+    DEBUG("sfsdebug", "  sfs_find_file_and_dir value %d, path left %s\n", cur_dir_block, *path);
     return cur_dir_block;
 error:
+    DEBUG("sfsdebug", "  sfs_find_file_and_dir error. last cur_dir %d\n", cur_dir_block);
     if (create_intermediate && need_to_write_bab)
         sfs_write_bab_cache(sfs);
     return 0;
