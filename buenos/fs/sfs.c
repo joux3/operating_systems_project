@@ -299,6 +299,7 @@ int sfs_path_stringcmp(const char *str1, const char *str2) {
 
 // travelses directories until path doesn't contain / or an intermediate dir wasn't found
 // also modifies the passed **path so that extra parsing isn't necessary
+// create_intermediate 1 also creates the directories that weren't found along the way if possible
 uint32_t sfs_root_inode_for_path(sfs_t *sfs, char **path) {
     uint32_t cur_dir_block = sfs_root_inode(sfs);
     int i, delim_count = 0;
@@ -356,6 +357,8 @@ uint32_t sfs_find_file_and_dir(sfs_t *sfs, char **filename, uint32_t *dir_block)
     uint32_t cur_dir_block, i;
     sfs_inode_dir_t *dir_inode;
     cur_dir_block = sfs_root_inode_for_path(sfs, filename); 
+    if (cur_dir_block == 0)
+        return 0;
     while (1) {
         r = sfs_read_block(sfs, cur_dir_block, &(sfs->inode.buffer));
         if (r == 0) {
@@ -557,8 +560,12 @@ int sfs_create(fs_t *fs, char *filename, int size)
 
     lock_acquire(sfs->lock);
 
-    // check if the file exists or not
+    // walk through the path and create intermediate directories if needed
+
     cur_dir_block = sfs_root_inode(sfs); 
+    if (cur_dir_block == 0)
+        return 0;
+    // check if the file exists or not at the final level
     while (1) {
         r = sfs_read_block(sfs, cur_dir_block, &(sfs->inode.buffer));
         if (r == 0) {
