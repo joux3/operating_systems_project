@@ -26,7 +26,6 @@ device_t *nic_init(io_descriptor_t *desc) {
     gnd_t *gnd;
     nic_real_device_t *real_dev;
     uint32_t irq_mask;
-
     dev = kmalloc(sizeof(device_t));
     gnd = kmalloc(sizeof(gnd_t));
     real_dev = kmalloc(sizeof(nic_real_device_t));
@@ -39,11 +38,22 @@ device_t *nic_init(io_descriptor_t *desc) {
     dev->io_address = desc->io_area_base;
     dev->type = desc->type;
 
+    ((nic_io_area_t*)dev->io_address)->command = NIC_COMMAND_CLEAR_RXIRQ;
+    ((nic_io_area_t*)dev->io_address)->command = NIC_COMMAND_CLEAR_RIRQ;
+    ((nic_io_area_t*)dev->io_address)->command = NIC_COMMAND_CLEAR_SIRQ;
+    ((nic_io_area_t*)dev->io_address)->command = NIC_COMMAND_CLEAR_RXBUSY;
+    ((nic_io_area_t*)dev->io_address)->command = NIC_COMMAND_CLEAR_RXIRQ;
+
     gnd->device = dev;
     gnd->send = nic_send;
     gnd->recv = nic_recv;
     gnd->frame_size = nic_frame_size;
     gnd->hwaddr = nic_hwaddr;
+    
+    spinlock_reset(&real_dev->slock);
+    real_dev->send_sleepq = 0;
+    real_dev->recv_sleepq = 0;
+    real_dev->recv_done_sleepq = 0;
 
     irq_mask = 1 << (desc->irq + 10);
     interrupt_register(irq_mask, nic_interrupt_handle, dev);
@@ -68,8 +78,10 @@ static void nic_interrupt_handle(device_t *device) {
     }
     if (NIC_STATUS_RXIRQ(io->status)) {
         //DEBUG("nic_test", "NIC DRIVER INTERRUPT HANDLER: interrupt RXIRQ\n");
-        //DEBUG("nic_test", "NIC DRIVER INTERRUPT HANDLER: waking %x\n", &real_dev->recv_sleepq);
-        sleepq_wake(&real_dev->recv_sleepq);
+        DEBUG("nic_test", "NIC DRIVER INTERRUPT HANDLER: waking %x\n", &real_dev->recv_sleepq);
+        int i;
+        for (i = 0; i < 1000; i++)
+            sleepq_wake(&real_dev->recv_sleepq);
     }
     if(NIC_STATUS_RIRQ(io->status)) {
         //DEBUG("nic_test", "NIC DRIVER INTERRUPT HANDLER: interrupt RIRQ\n");

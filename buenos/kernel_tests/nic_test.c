@@ -10,8 +10,8 @@
 #include "kernel/assert.h"
 
 #define POP_PROTOCOL    0x01
-#define SOCKETS         1
-#define TEST_RUNS       5
+#define SOCKETS         5
+#define TEST_RUNS       1000000
 
 /* socket data from socket.c */
 extern socket_descriptor_t open_sockets[CONFIG_MAX_OPEN_SOCKETS];
@@ -33,7 +33,7 @@ void send_thread(uint32_t param) {
     int success;
     int i, j = 0;
     while (j++ < TEST_RUNS) {
-        thread_sleep(50000);
+        thread_sleep(500);
         for (i = 0; i < SOCKETS; i++) {
             kprintf("SENDING THREAD: Sending from socket %d to addr %x, destination port %d\n", send_sockets[i], addr, open_sockets[recv_sockets[i]].port);
             kprintf("SENDING THREAD: Sending data %d\n", ++send_data);
@@ -42,6 +42,8 @@ void send_thread(uint32_t param) {
                 kprintf("SENDING_THREAD: send failed!\n");
             else
                 kprintf("SENDING_THREAD: sending succeeded, sent %d bytes.\n", success);
+            thread_switch();
+            thread_sleep(500);
         }
     }
     kprintf("SENDING THREAD: finished sending\n");
@@ -72,14 +74,12 @@ void recv_thread(uint32_t param) {
             kprintf("RECEIVEING THREAD: Message content %d\n", recv_data);
             //nic_driver->recv(nic_driver, buffer);
             //kprintf("message received, content %d\n", recv_data);
-            thread_switch();
-            thread_sleep(50);
         }
     }
     kprintf("RECEIVEING THREAD: finished receiving\n");
 }
 
-void nic_test_main(void) {
+int nic_test_main(void) {
     addr = 0x0f01beef;
     nic_driver = (gnd_t*)device_get(YAMS_TYPECODE_NIC, 0)->generic_device;
     int i;
@@ -99,7 +99,8 @@ void nic_test_main(void) {
     thread_run(thread);
     thread = thread_create(&recv_thread, 1);
     thread_run(thread);
-    while(1) {};
+    while(1) {}
+    return 0;
 }
 
 
