@@ -21,7 +21,14 @@ int main(int argc, char **argv) {
         prints("Usage: fscnctest  <filename> <filesize> <n_big> <n_small> \n");
         return 1;
     } 
-
+    char *filename = argv[1];
+    int filesize = atoi(argv[2]);
+    
+    
+    if (syscall_create(filename, filesize) < 0) {
+        prints("failed to create file!\n");
+    }
+   
 
     prints("Starting x amount of concurrent processes\n");
 
@@ -62,5 +69,12 @@ int main(int argc, char **argv) {
             prints(" in background"); 
         }
     }
+    // all the reads opened before this point should go through
+    pid = syscall_execp("[testi]rm", 2 , (const char**)argv);
+        if (pid < 0) {
+            prints("failed to start process: "); 
+            itoa(pid, retval_buf);
+            prints(retval_buf);
+        } 
     return 0;
 }

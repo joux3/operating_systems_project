@@ -26,9 +26,6 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    if (syscall_create(filename, filesize) < 0) {
-        prints("failed to create file!\n");
-    }
     
     int filehandle = syscall_open(filename);
     if (filehandle < 0) {

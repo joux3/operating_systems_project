@@ -529,6 +529,8 @@ int sfs_open(fs_t *fs, char *filename) {
         f.open_count = 0;
         sfs->open_files[index] = f;
     }
+    if(sfs->open_files[index].is_deleted)
+        goto error;
     sfs->open_files[index].open_count++;
     lock_release(sfs->lock);
     DEBUG("sfsdebug", "SFS_open: file %s opened successfully\n", filename);
@@ -890,12 +892,14 @@ int sfs_close(fs_t *fs, int fileid)
     f = &(sfs->open_files[fileid]);
     f->open_count--;
     //if file is deleted and this is the last process to close it delete file
-    if(f->is_deleted && f->open_count == 0) {
-        if(sfs_free_file_blocks(sfs, f->file_block) == 0) {
-            lock_release(sfs->lock);
-            return VFS_ERROR;        
+    if(f->open_count == 0) {
+        if(f->is_deleted) { 	
+            if(sfs_free_file_blocks(sfs, f->file_block) == 0) {
+                lock_release(sfs->lock);
+                return VFS_ERROR;        
+            }
+            sfs_write_bab_cache(sfs);
         }
-        sfs_write_bab_cache(sfs);
 
         lock_acquire(f->lock);
         int i;
