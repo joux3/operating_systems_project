@@ -10,6 +10,232 @@ Members
 Network driver tests
 --------
 
+The network driver is tested using the socket interface provided by BUENOS. The idea
+is to create ten sockets (five sending and five listening) and the proceed to send
+a lot of traffic through the sockets. Naturally all traffic has to go through the NIC,
+so if the NIC works, the traffic between sockets works just fine.
+
+The test is located in kernel_tests and you can invoke it with the following command:
+
+yams buenos nic_test
+
+Here's partial output:
+
+Initializing memory allocation system
+Kernel size is 0x00039934 (235828) bytes
+System memory size is 0x000a0000 (655360) bytes
+Reading boot arguments
+Detected 4 CPUs
+Initializing interrupt handling
+Initializing threading system
+Initializing sleep queue
+Initializing semaphores
+Initializing locks and condition variables
+Initializing process tables
+Initializing device drivers
+Device: Type 0x401 at 0xb0008064 irq 0x2 driver 'NIC'
+Device: Type 0x201 at 0xb0008058 irq 0x4 driver 'Console'
+Device: Type 0x301 at 0xb0008044 irq 0x3 driver 'Disk'
+Device: Type 0x301 at 0xb0008030 irq 0x3 driver 'Disk'
+Device: Type 0xc03 at 0xb0008028 irq 0x0 driver 'CPU status'
+Device: Type 0xc02 at 0xb0008020 irq 0x0 driver 'CPU status'
+Device: Type 0xc01 at 0xb0008018 irq 0x0 driver 'CPU status'
+Device: Type 0xc00 at 0xb0008010 irq 0x0 driver 'CPU status'
+Device: Type 0x101 at 0xb000800c no irq  driver 'System memory information'
+Device: Type 0x102 at 0xb0008004 no irq  driver 'System RTC'
+Device: Type 0x103 at 0xb0008000 no irq  driver 'System shutdown'
+Initializing virtual filesystem
+VFS: Max filesystems: 8, Max open files: 512
+Initializing scheduler
+Initializing virtual memory
+Pagepool: Found 160 pages of size 4096
+Pagepool: Static allocation for kernel: 79 pages
+Creating initialization thread
+Starting threading system and SMP
+Mounting filesystems
+VFS: SFS initialized on disk at 0xb0008044
+VFS: Mounted filesystem volume [sfs]
+VFS: TFS initialized on disk at 0xb0008030
+VFS: Mounted filesystem volume [testi]
+Initializing networking
+Network: started network services on device at address 0f01beef
+No initial program (initprog), dropping to fallback
+Creating sockets for ports 1 and 6
+Created sockets 0 and 1, bound to ports 1 and 6
+Creating sockets for ports 2 and 7
+Created sockets 2 and 3, bound to ports 2 and 7
+Creating sockets for ports 3 and 8
+Created sockets 4 and 5, bound to ports 3 and 8
+Creating sockets for ports 4 and 9
+Created sockets 6 and 7, bound to ports 4 and 9
+Creating sockets for ports 5 and 10
+Created sockets 8 and 9, bound to ports 5 and 10
+Starting NIC test
+SENDING THREAD: Running send thread
+RECEIVING THREAD: Running receive thread
+RECEIVEING THREAD: receiving from socket 1, port 6
+SENDING THREAD: Sending from socket 0 to addr f01beef, destination port 6
+SENDING THREAD: Sending data 1
+SENDING_THREAD: sending succeeded, sent 4 bytes.
+RECEIVING THREAD: succeeded at receiving, received 4 bytes
+RECEIVEING THREAD: Recieved the following things:
+RECEIVEING THREAD: Message from address f01beef
+RECEIVEING THREAD: Message content 1
+RECEIVEING THREAD: receiving from socket 3, port 7
+SENDING THREAD: Sending from socket 2 to addr f01beef, destination port 7
+SENDING THREAD: Sending data 2
+SENDING_THREAD: sending succeeded, sent 4 bytes.
+RECEIVING THREAD: succeeded at receiving, received 4 bytes
+RECEIVEING THREAD: Recieved the following things:
+RECEIVEING THREAD: Message from address f01beef
+RECEIVEING THREAD: Message content 2
+RECEIVEING THREAD: receiving from socket 5, port 8
+SENDING THREAD: Sending from socket 4 to addr f01beef, destination port 8
+SENDING THREAD: Sending data 3
+SENDING_THREAD: sending succeeded, sent 4 bytes.
+RECEIVING THREAD: succeeded at receiving, received 4 bytes
+RECEIVEING THREAD: Recieved the following things:
+RECEIVEING THREAD: Message from address f01beef
+RECEIVEING THREAD: Message content 3
+RECEIVEING THREAD: receiving from socket 7, port 9
+SENDING THREAD: Sending from socket 6 to addr f01beef, destination port 9
+SENDING THREAD: Sending data 4
+SENDING_THREAD: sending succeeded, sent 4 bytes.
+RECEIVING THREAD: succeeded at receiving, received 4 bytes
+RECEIVEING THREAD: Recieved the following things:
+RECEIVEING THREAD: Message from address f01beef
+RECEIVEING THREAD: Message content 4
+RECEIVEING THREAD: receiving from socket 9, port 10
+SENDING THREAD: Sending from socket 8 to addr f01beef, destination port 10
+SENDING THREAD: Sending data 5
+SENDING_THREAD: sending succeeded, sent 4 bytes.
+RECEIVING THREAD: succeeded at receiving, received 4 bytes
+RECEIVEING THREAD: Recieved the following things:
+RECEIVEING THREAD: Message from address f01beef
+RECEIVEING THREAD: Message content 5
+RECEIVEING THREAD: receiving from socket 1, port 6
+SENDING THREAD: Sending from socket 0 to addr f01beef, destination port 6
+SENDING THREAD: Sending data 6
+SENDING_THREAD: sending succeeded, sent 4 bytes.
+RECEIVING THREAD: succeeded at receiving, received 4 bytes
+RECEIVEING THREAD: Recieved the following things:
+RECEIVEING THREAD: Message from address f01beef
+RECEIVEING THREAD: Message content 6
+RECEIVEING THREAD: receiving from socket 3, port 7
+SENDING THREAD: Sending from socket 2 to addr f01beef, destination port 7
+SENDING THREAD: Sending data 7
+SENDING_THREAD: sending succeeded, sent 4 bytes.
+RECEIVING THREAD: succeeded at receiving, received 4 bytes
+RECEIVEING THREAD: Recieved the following things:
+RECEIVEING THREAD: Message from address f01beef
+RECEIVEING THREAD: Message content 7
+RECEIVEING THREAD: receiving from socket 5, port 8
+SENDING THREAD: Sending from socket 4 to addr f01beef, destination port 8
+SENDING THREAD: Sending data 8
+SENDING_THREAD: sending succeeded, sent 4 bytes.
+RECEIVING THREAD: succeeded at receiving, received 4 bytes
+RECEIVEING THREAD: Recieved the following things:
+RECEIVEING THREAD: Message from address f01beef
+RECEIVEING THREAD: Message content 8
+RECEIVEING THREAD: receiving from socket 7, port 9
+SENDING THREAD: Sending from socket 6 to addr f01beef, destination port 9
+SENDING THREAD: Sending data 9
+SENDING_THREAD: sending succeeded, sent 4 bytes.
+RECEIVING THREAD: succeeded at receiving, received 4 bytes
+RECEIVEING THREAD: Recieved the following things:
+RECEIVEING THREAD: Message from address f01beef
+RECEIVEING THREAD: Message content 9
+RECEIVEING THREAD: receiving from socket 9, port 10
+SENDING THREAD: Sending from socket 8 to addr f01beef, destination port 10
+SENDING THREAD: Sending data 10
+SENDING_THREAD: sending succeeded, sent 4 bytes.
+RECEIVING THREAD: succeeded at receiving, received 4 bytes
+RECEIVEING THREAD: Recieved the following things:
+RECEIVEING THREAD: Message from address f01beef
+RECEIVEING THREAD: Message content 10
+RECEIVEING THREAD: receiving from socket 1, port 6
+SENDING THREAD: Sending from socket 0 to addr f01beef, destination port 6
+SENDING THREAD: Sending data 11
+SENDING_THREAD: sending succeeded, sent 4 bytes.
+RECEIVING THREAD: succeeded at receiving, received 4 bytes
+RECEIVEING THREAD: Recieved the following things:
+RECEIVEING THREAD: Message from address f01beef
+RECEIVEING THREAD: Message content 11
+RECEIVEING THREAD: receiving from socket 3, port 7
+SENDING THREAD: Sending from socket 2 to addr f01beef, destination port 7
+SENDING THREAD: Sending data 12
+SENDING_THREAD: sending succeeded, sent 4 bytes.
+RECEIVING THREAD: succeeded at receiving, received 4 bytes
+RECEIVEING THREAD: Recieved the following things:
+RECEIVEING THREAD: Message from address f01beef
+RECEIVEING THREAD: Message content 12
+RECEIVEING THREAD: receiving from socket 5, port 8
+SENDING THREAD: Sending from socket 4 to addr f01beef, destination port 8
+SENDING THREAD: Sending data 13
+SENDING_THREAD: sending succeeded, sent 4 bytes.
+RECEIVING THREAD: succeeded at receiving, received 4 bytes
+RECEIVEING THREAD: Recieved the following things:
+RECEIVEING THREAD: Message from address f01beef
+RECEIVEING THREAD: Message content 13
+RECEIVEING THREAD: receiving from socket 7, port 9
+SENDING THREAD: Sending from socket 6 to addr f01beef, destination port 9
+SENDING THREAD: Sending data 14
+SENDING_THREAD: sending succeeded, sent 4 bytes.
+RECEIVING THREAD: succeeded at receiving, received 4 bytes
+RECEIVEING THREAD: Recieved the following things:
+RECEIVEING THREAD: Message from address f01beef
+RECEIVEING THREAD: Message content 14
+RECEIVEING THREAD: receiving from socket 9, port 10
+SENDING THREAD: Sending from socket 8 to addr f01beef, destination port 10
+SENDING THREAD: Sending data 15
+SENDING_THREAD: sending succeeded, sent 4 bytes.
+RECEIVING THREAD: succeeded at receiving, received 4 bytes
+RECEIVEING THREAD: Recieved the following things:
+RECEIVEING THREAD: Message from address f01beef
+RECEIVEING THREAD: Message content 15
+RECEIVEING THREAD: receiving from socket 1, port 6
+SENDING THREAD: Sending from socket 0 to addr f01beef, destination port 6
+SENDING THREAD: Sending data 16
+SENDING_THREAD: sending succeeded, sent 4 bytes.
+RECEIVING THREAD: succeeded at receiving, received 4 bytes
+RECEIVEING THREAD: Recieved the following things:
+RECEIVEING THREAD: Message from address f01beef
+RECEIVEING THREAD: Message content 16
+RECEIVEING THREAD: receiving from socket 3, port 7
+SENDING THREAD: Sending from socket 2 to addr f01beef, destination port 7
+SENDING THREAD: Sending data 17
+SENDING_THREAD: sending succeeded, sent 4 bytes.
+RECEIVING THREAD: succeeded at receiving, received 4 bytes
+RECEIVEING THREAD: Recieved the following things:
+RECEIVEING THREAD: Message from address f01beef
+RECEIVEING THREAD: Message content 17
+RECEIVEING THREAD: receiving from socket 5, port 8
+SENDING THREAD: Sending from socket 4 to addr f01beef, destination port 8
+SENDING THREAD: Sending data 18
+SENDING_THREAD: sending succeeded, sent 4 bytes.
+RECEIVING THREAD: succeeded at receiving, received 4 bytes
+RECEIVEING THREAD: Recieved the following things:
+RECEIVEING THREAD: Message from address f01beef
+RECEIVEING THREAD: Message content 18
+RECEIVEING THREAD: receiving from socket 7, port 9
+SENDING THREAD: Sending from socket 6 to addr f01beef, destination port 9
+SENDING THREAD: Sending data 19
+SENDING_THREAD: sending succeeded, sent 4 bytes.
+RECEIVING THREAD: succeeded at receiving, received 4 bytes
+RECEIVEING THREAD: Recieved the following things:
+RECEIVEING THREAD: Message from address f01beef
+RECEIVEING THREAD: Message content 19
+RECEIVEING THREAD: receiving from socket 9, port 10
+SENDING THREAD: Sending from socket 8 to addr f01beef, destination port 10
+SENDING THREAD: Sending data 20
+SENDING_THREAD: sending succeeded, sent 4 bytes.
+RECEIVING THREAD: succeeded at receiving, received 4 bytes
+RECEIVEING THREAD: Recieved the following things:
+RECEIVEING THREAD: Message from address f01beef
+RECEIVEING THREAD: Message content 20
+RECEIVEING THREAD: receiving from socket 1, port 6
+
+
 --------
 Filesystem tests
 --------
