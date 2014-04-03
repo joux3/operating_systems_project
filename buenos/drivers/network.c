@@ -89,7 +89,8 @@ static void nic_interrupt_handle(device_t *device) {
 static int nic_send(gnd_t *gnd, void *frame, network_address_t addr) {
     
     addr = addr; // Address is no longer needed, since we copy from
-                 // buffer to buffer
+                 // buffer to buffer (also, the frame already holds
+                 // the address)
 
     interrupt_status_t intr_status;
     nic_real_device_t *real_dev = gnd->device->real_device;
