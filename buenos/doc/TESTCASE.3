@@ -7,3 +7,31 @@ Members
   Olli-Matti Saario
 
 --------
+Network driver tests
+--------
+
+--------
+Filesystem tests
+--------
+// tähän joku concurrent tesT?!
+
+--------
+Test 2: fstest <filename> <filesize> <blocksize>
+
+fstest creates a file with the given name and size. Then it writes the file full
+of data in blocks of maximum size blocksize. After writing the data, it seeks to
+start and verifies the written data by reading it back.
+
+You can run it with the following command (900kB test):
+
+[testi]fstest [sfs]testfile 900000 1024
+
+Example print when ran from our shell:
+
+> [testi]fstest [sfs]testfile 900000 
+OK, fstest wrote bytes. checking result
+read contents match the written contents!
+return value: 0
+
+--------
+
