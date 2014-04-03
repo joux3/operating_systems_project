@@ -529,8 +529,7 @@ int sfs_open(fs_t *fs, char *filename) {
         f.open_count = 0;
         sfs->open_files[index] = f;
     }
-    if(sfs->open_files[index].is_deleted)
-        goto error;
+    KERNEL_ASSERT(!sfs->open_files[index].is_deleted);
     sfs->open_files[index].open_count++;
     lock_release(sfs->lock);
     DEBUG("sfsdebug", "SFS_open: file %s opened successfully\n", filename);
