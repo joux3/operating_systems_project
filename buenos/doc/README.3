@@ -11,11 +11,39 @@ Members
 Assignment 1
 
 1. Changed files
+    - driver/network.h
+    - driver/network.c
+
 2. Description of the solution
+    - the init functions clears the NIC (clears all IRQs, resets spinlock),
+      initializes the required memory, binds the functions to the gnd and
+      registers the interrupt handles
+    - the interrupt handler listens to the interrupts and wakes the appropriate
+      sleeping threads (what sleeps on what is described later)
+    - also worth noting that the interrupt handler clears the RXIRQ, since in
+      testing it turned out that if it wasn't cleared here, the clearing code
+      would very likely not be scheduled later
+    - the send and receive functions work roughly the same way - once they
+      are called, they wil check if the NIC is sending/receiving
+        - if the NIC is sending/receiving, put the thread to sleep (waking
+          up once the correct interrupts are received)
+        - if not (or the thread is woken up and is now clear to proceed), send the
+          appropriate commands to the NIC and check for errors
+        - if there were errors, NIC is in corrupted state -> KERNEL PANIC
+        - otherwise return 0 to signify success
+    - the frame size and hwaddr functions are fairly trivial, since you can simply
+      get your values from the NIC io area
 
 3. Motivation behind the solution
+    - we followed the instructions on the BUENOS roadmap and YAMS manual, and that
+      resulted in a pretty clean solution
 
 4. Changes to the plan presented in the review session
+    - originally the RXIRQ was cleared once the receiving thread had woken up, but it
+      turned out that the thread in nic_recv would never be scheduled while the
+      interrupt handler was screaming it to wake up - we fixed this by adding a flag
+      to the nic_real_dev that is set in the interrupt handler to signify that there is
+      a message in the buffer and clearing the RXIRQ and cleared once nic_recv is scheduled.
 
 ----------
 
