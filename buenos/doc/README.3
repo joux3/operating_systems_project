@@ -15,6 +15,10 @@ Assignment 1
     - driver/network.c
 
 2. Description of the solution
+    - the relevant datastructures are:
+        - a struct for the NIC IO area (layout as described in the YAMS manual)
+        - NIC real device struct that holds spinlock, message received flag and
+          the elements used to put threads to the sleep queue
     - the init functions clears the NIC (clears all IRQs, resets spinlock),
       initializes the required memory, binds the functions to the gnd and
       registers the interrupt handler
@@ -25,7 +29,8 @@ Assignment 1
       would very likely not be scheduled later
     - the send and receive functions work roughly the same way - once they
       are called, they wil check if the NIC is sending/receiving
-        - if the NIC is sending/receiving, put the thread to sleep (waking
+        - if the NIC is sending/receiving or in the receiving case no packet has arrived yet,
+          put the thread to sleep (waking
           up once the correct interrupts are received)
         - if not (or the thread is woken up and is now clear to proceed), send the
           appropriate commands to the NIC and check for errors
@@ -57,30 +62,27 @@ Assignment 2
 2. Description of the solution
     - Added struct sfs_open_file_t to describe an open file 
         - lock for writer mutual exclusion
-        - semaphore with initial value of MAX_READERS for readers
+        - semaphore with initial value of MAX_READERS for access
         - int is_deleted flag
         - uint32_t file_block to file header block
 
     - Changed sfs_t by adding a sfs_open_file_t array of size SFS_MAX_OPEN_FILES
 
-    - Removed the semaphore that locked the whole sfs struct in read and write in 
-order to access reads and writes concurrently
-
-    - sfs_open changes from tfs_open:
+    - sfs_open:
+        - find disk block of the file (fail if not found)
         - check if file with name already opened by checking the open_files array
+          for the file block
             - if open:
                 - if deleted flag is up return VFS_ERROR
-                - raise the open_count for file  
                 - save array index for handle
             - else:
                 - if not set up new sfs_open_file_t to unreserved spot in open_files
-                    - create lock and sem 
+                    - create lock and access semaphore 
                     - set is_deleted to 0 and open_count to 0
-                    - save file block
         - already open or not raise open_count by 1 and return index as handle
 
     - sfs_close:
-        - lock sfs by taking the semaphore
+        - lock sfs
         - lower file open_count
         - if file open_count == 0 and its marked as deleted by is_deleted:
             - free all file blocks
@@ -88,30 +90,32 @@ order to access reads and writes concurrently
         - release sfs lock
     
     - sfs-read:
-        - remove sfs semaphore usage
         - get the corresponding sfs_open_file_t with given handle
         - lower the semaphore in open_file by 1
-        - read the same way as in tfs except that create buffer_inode to stack 
-instead of using the same always
+        - read the file with buffers allocated dynamically
         - raise the semaphore in open_file and return
         
     - sfs-write:
-        - remove sfs semaphore usage
         - get the corresponding sfs_open_file_t with given handle
         - take write lock for the open_file
-        - lower the semaphore in open_file in loop until the value is 0 so that all
- readers are locked out
-        - write the same way as in tfs
-        - raise the semaphore locking readers back to its inital value in loop
+        - lower the semaphore in open_file in loop MAX_READERS times so that all
+          readers are locked out
+        - write data to disk
+        - raise the semaphore MAX_READERS times
         - unlock write lock for open_file and return 
 
-    - sfs-unmount changes to tfs implementation:
+    - sfs-unmount:
         - loop all open_files and close them, thus releasing all locks and sems
        
 
 3. Motivation behind the solution
+    - easily allows concurrent access to reading/writing the same same
+    - semaphore easily fits the use case of multiple readers/writers
+    - lock in sfs_open_file_t is required to serialize writers as the semaphore interface
+      doesn't support lowering the value with arbitary amount in a single call
    
 4. Changes to the plan presented in the review session
+    - none
 
 --------------
 
