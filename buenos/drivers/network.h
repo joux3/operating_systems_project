@@ -43,6 +43,7 @@ typedef struct {
 
 typedef struct {
     spinlock_t slock;
+    uint8_t msg_recvd;
     uint8_t send_sleepq;
     uint8_t recv_sleepq;
     uint8_t recv_done_sleepq;
