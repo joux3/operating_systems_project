@@ -5,7 +5,6 @@
 #include "kernel/assert.h"
 #include "kernel/semaphore.h"
 #include "kernel/spinlock.h"
-#include "kernel/thread.h"
 #include "kernel/sleepq.h"
 #include "kernel/interrupt.h"
 #include "lib/libc.h"
@@ -13,7 +12,6 @@
 #include "drivers/yams.h"
 #include "drivers/gnd.h"
 #include "drivers/network.h"
-#include "lib/debug.h"
 
 static void nic_interrupt_handle(device_t *device);
 static int nic_send(gnd_t *gnd, void *frame, network_address_t addr);

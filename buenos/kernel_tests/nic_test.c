@@ -1,11 +1,7 @@
 #ifdef CHANGED_3
 
 #include "kernel/thread.h"
-#include "lib/debug.h"
-#include "drivers/device.h"
-#include "drivers/gnd.h"
 #include "net/network.h"
-#include "net/pop.h"
 #include "net/socket.h"
 #include "kernel/assert.h"
 
