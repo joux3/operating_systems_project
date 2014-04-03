@@ -52,7 +52,7 @@
 #ifdef CHANGED_3
     #define IO_KERNEL_BUFFER_SIZE 1024
 #else
-    #define IO_KERNEL_BUFFER_SIZE 256
+#error
 #endif
 
 gcd_t *syscall_get_console_gcd(void) {
@@ -180,6 +180,7 @@ int close_file(int filehandle) {
 int seek_file(int filehandle, int pos) {
     lock_acquire(process_filehandle_lock);
     filehandle -= 3;
+    #ifdef CHANGED_3
     if (filehandle < 0 || filehandle >= CONFIG_MAX_OPEN_FILES) { 
         lock_release(process_filehandle_lock);
         return -1;
@@ -192,9 +193,13 @@ int seek_file(int filehandle, int pos) {
         lock_release(process_filehandle_lock);
         return vfs_seek(handle_entry->vfs_handle, pos);
     }
+    #else
+    #error
+    #endif
 }
 
 int read_from_handle(int filehandle, void* buffer, int length) {
+    #ifdef CHANGED_3
     int result, n;
     uint8_t kernel_buffer[IO_KERNEL_BUFFER_SIZE];
     gcd_t *console;
@@ -219,6 +224,9 @@ int read_from_handle(int filehandle, void* buffer, int length) {
     } else {
         result = -1;
     }
+    #else
+    #error
+    #endif
 
     if (result > 0) {
         n = kernel_to_userland_memcpy(kernel_buffer, buffer, result);
@@ -231,6 +239,7 @@ int read_from_handle(int filehandle, void* buffer, int length) {
 }
 
 int write_to_handle(int filehandle, void* buffer, int length) {
+    #ifdef CHANGED_3
     int result, n;
     uint8_t kernel_buffer[IO_KERNEL_BUFFER_SIZE];
     gcd_t *console;
@@ -259,6 +268,9 @@ int write_to_handle(int filehandle, void* buffer, int length) {
     } else {
         result = -1;
     }
+    #else
+    #error
+    #endif
     return result;
 }
 
