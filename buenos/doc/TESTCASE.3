@@ -239,7 +239,97 @@ RECEIVEING THREAD: receiving from socket 1, port 6
 --------
 Filesystem tests
 --------
-// tähän joku concurrent tesT?!
+Test 2: parallelread <filename> <size> <n_readers> <n_writers>
+
+Parallelread first creates a file with given filename and opens it. Then it spawns 
+n_readers amount of readtest executables that opens the file and reads <size> bytes 
+from it. After that it spawns <n_writers> amount of writetest executables which just 
+opens the file and writes <size> amount of
+characters to a file. The point of this test is that given large 
+<size> parameters there should be concurrent readers to files at some points. All 
+filehandles opened before the rm call should also be able to finish their writes 
+and reads and the file blocks should be deleted when all the filehandles are closed.
+
+You can run it with the following command in the shell:
+
+[testi]parallelread [sfs]fnam 100000 5 2 
+
+Example print when ran from our shell:
+
+-------------
+
+SFS_read: end with offset 28672,  open count 7
+SFS_read: start with offset 13312, size 512 open count 7
+SFS_read: end with offset 22016,  open count 7
+SFS_read: end with offset 10240,  open count 7
+SFS_read: start with offset 17408, size 512 open count 7
+Reading block 119
+Reading block 120
+Reading block 152
+Reading block 121
+Reading block 153
+Reading block 122
+Reading block 154
+SFS_read: end with offset 13824,  open count 7
+Reading block 155
+SFS_read: end with offset 17920,  open count 7
+SFS_read: start with offset 28672, size 512 open count 7
+Reading block 243
+Reading block 244
+Reading block 245
+Reading block 246
+SFS_read: end with offset 29184,  open count 7
+SFS_read: start with offset 22016, size 512 open count 7
+Reading block 189
+Reading block 190
+Reading block 191
+Reading block 192
+SFS_read: end with offset 22528,  open count 7
+SFS_read: start with offset 10240, size 512 open count 7
+Reading block 94
+Reading block 95
+Reading block 96
+Reading block 97
+SFS_read: end with offset 10752,  open count 7
+SFS_write: got all readers
+Writing block 27, 128 new bytes
+Writing block 28, 128 new bytes
+Writing block 29, 128 new bytes
+Writing block 30, 128 new bytes
+Writing block 31, 128 new bytes
+Writing block 32, 128 new bytes
+Writing block 33, 128 new bytes
+Writing block 34, 128 new bytes
+SFS_write: DONE release the hounds(readers)
+
+From this print we can see that seven handles are open to the file and when the 
+writers writes to file there aren't any readers reading it. We can also see that 
+more than one read call gets executed concurrently.
+
+SFS_write: DONE release the hounds(readers)
+SFS_write: release read lock
+SFS_write: file with handle 0. offset 99328, len 672 datasize
+SFS_write: file with handle 0 open_count 1
+SFS_write: file  waiting for lock
+SFS_write: file  got lock waiting sem
+SFS_write: got all readers
+Writing block 1620, 128 new bytes
+Writing block 1621, 128 new bytes
+Writing block 1622, 128 new bytes
+Writing block 1623, 128 new bytes
+Writing block 1624, 128 new bytes
+Reading block 1625 before overwriting parts
+Writing block 1625, 32 new bytes
+SFS_write: DONE release the hounds(readers)
+SFS_write: release read lock
+OK, fstest wrote bytes. closing file
+SFS freeing diskblock 818, data block 809
+SFS freeing diskblock 819, data block 810
+SFS freeing diskblock 820, data block 811
+SFS freeing diskblock 821, data block 812
+
+From this print we can see that the file blocks get deleted only after all 
+filehandles are closed.
 
 --------
 
