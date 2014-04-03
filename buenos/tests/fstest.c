@@ -69,7 +69,7 @@ int main(int argc, char **argv) {
         }
         total_read += read;
     }
-    prints("read contents match the written contests!\n");
+    prints("read contents match the written contents!\n");
 
     return 0;
 }
