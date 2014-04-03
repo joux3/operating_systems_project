@@ -17,7 +17,7 @@ Assignment 1
 2. Description of the solution
     - the init functions clears the NIC (clears all IRQs, resets spinlock),
       initializes the required memory, binds the functions to the gnd and
-      registers the interrupt handles
+      registers the interrupt handler
     - the interrupt handler listens to the interrupts and wakes the appropriate
       sleeping threads (what sleeps on what is described later)
     - also worth noting that the interrupt handler clears the RXIRQ, since in
