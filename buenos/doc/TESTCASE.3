@@ -250,6 +250,10 @@ characters to a file. The point of this test is that given large
 filehandles opened before the rm call should also be able to finish their writes 
 and reads and the file blocks should be deleted when all the filehandles are closed.
 
+Start buenos with following command:
+
+yams buenos "sfsdebug" "initprog=[testi]shell"
+
 You can run it with the following command in the shell:
 
 [testi]parallelread [sfs]fnam 100000 5 2 
