@@ -22,7 +22,6 @@ sock_t recv_sockets[SOCKETS];
 uint16_t sports[SOCKETS];
 uint16_t rports[SOCKETS];
 network_address_t addr;
-gnd_t *nic_driver;
 
 void send_thread(uint32_t param) {
     kprintf("SENDING THREAD: Running send thread\n");
@@ -72,8 +71,6 @@ void recv_thread(uint32_t param) {
             kprintf("RECEIVEING THREAD: Recieved the following things:\n");
             kprintf("RECEIVEING THREAD: Message from address %x\n", sender_addr);
             kprintf("RECEIVEING THREAD: Message content %d\n", recv_data);
-            //nic_driver->recv(nic_driver, buffer);
-            //kprintf("message received, content %d\n", recv_data);
         }
     }
     kprintf("RECEIVEING THREAD: finished receiving\n");
@@ -81,7 +78,6 @@ void recv_thread(uint32_t param) {
 
 int nic_test_main(void) {
     addr = 0x0f01beef;
-    nic_driver = (gnd_t*)device_get(YAMS_TYPECODE_NIC, 0)->generic_device;
     int i;
     for (i = 0; i < SOCKETS; i++) {
         sports[i] = i + 1;
