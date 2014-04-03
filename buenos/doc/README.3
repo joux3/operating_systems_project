@@ -36,6 +36,7 @@ Assignment 3
 1. Changed files
     - fs/sfs.c
     - fs/sfs.h
+
 2. Description of the solution
     - each file can have both direct and indirect data blocks associated with it
     - indirect blocks contain links to data blocks or other indirect blocks
@@ -43,11 +44,16 @@ Assignment 3
       data block, one double indirect data block and one triple indirect data block
       (for example double indirect data block link in a file links to a block that 
       links to a block that contains links to actual data blocks)
+    - track of used disk blocks is kept using Block Allocation Blocks that just contain
+      a bitmap of the block free statuses. enough BABs are allocated to cover the whole
+      disk
+
 3. Motivation behind the solution
     - supporting files up to 1 megabyte in size requires a file structure, that can
       refer to 8192 different 128-byte-size disk blocks. the presented solution is a
       simple way to achieve that and it doesn't waste too much space as the indirect
       blocks are only used when needed
+
 4. Changes to the plan presented in the review session
     - none
 
@@ -56,9 +62,30 @@ Assignment 3
 Assignment 4
 
 1. Changed files
+    - fs/sfs.c
+    - fs/sfs.h
 
 2. Description of the solution
+    - each inode block on the disk is marked as a directory or file
+        - file inodes work like described in assignment 3 
+        - dir inodes just contain names and inode links + inode link to the next dir 
+          in chain 
+    - directory nodes just contain names and inode links to the actual blocks which can
+      be either directory or file blocks
+    - the root directory is always the first inode after all the Block Allocation Blocks
+    - for example; the file a/b/c is found by
+        - starting from the root inode and looking for entry with the name "a"
+          (if it's not found from the root dir inode, continue to follow the directory chain
+           until the chain ends or it's found)
+        - make sure that the found inode is a directory. then do the same steps again for "b",
+          but starting from the current inode
+        - finally look for the entry "c", also following the chain if needed
 
 3. Motivation behind the solution
+    - making no distinction between files and directories in the entry links simplifies 
+      implementation
+    - dir inodes for a certain level form a chain so that a directory can hold more files
+      or subdirectories than can fit in one disk block
 
 4. Changes to the plan presented in the review session
+    - none
