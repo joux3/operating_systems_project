@@ -34,9 +34,22 @@ Assignment 2
 Assignment 3
 
 1. Changed files
+    - fs/sfs.c
+    - fs/sfs.h
 2. Description of the solution
+    - each file can have both direct and indirect data blocks associated with it
+    - indirect blocks contain links to data blocks or other indirect blocks
+    - file inodes have support for multiple direct data blocks, one single indirect
+      data block, one double indirect data block and one triple indirect data block
+      (for example double indirect data block link in a file links to a block that 
+      links to a block that contains links to actual data blocks)
 3. Motivation behind the solution
+    - supporting files up to 1 megabyte in size requires a file structure, that can
+      refer to 8192 different 128-byte-size disk blocks. the presented solution is a
+      simple way to achieve that and it doesn't waste too much space as the indirect
+      blocks are only used when needed
 4. Changes to the plan presented in the review session
+    - none
 
 ------------------
 
