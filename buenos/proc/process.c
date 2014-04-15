@@ -311,11 +311,7 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
 
         new_entry->state = THREAD_FREE;
 
-        #ifdef CHANGED_4
-        _tlb_set_asid(my_entry->pagetable->ASID);
-        #else
         tlb_fill(my_entry->pagetable);
-        #endif
 
         vm_destroy_pagetable(pagetable);
 
@@ -373,13 +369,14 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
 
     DEBUG("processdebug", "filling tlb for new process\n");
 
+    intr_status = _interrupt_disable();
+    #ifdef CHANGED_4
+    // fill the TLB as much as possible
+    tlb_fill(new_entry->pagetable);
+    #else
     /* Put the mapped pages into TLB. Here we again assume that the
        pages fit into the TLB. After writing proper TLB exception
        handling this call should be skipped. */
-    intr_status = _interrupt_disable();
-    #ifdef CHANGED_4
-    _tlb_set_asid(new_entry->pagetable->ASID);
-    #else
     tlb_fill(new_entry->pagetable);
     #endif
     _interrupt_set_state(intr_status);
@@ -490,10 +487,9 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
     my_entry->pagetable = original_pagetable;
     if (my_entry->pagetable) {
         #ifdef CHANGED_4
-        _tlb_set_asid(my_entry->pagetable->ASID);
-        #else
-        tlb_fill(my_entry->pagetable);
+        // fill as much as possible
         #endif
+        tlb_fill(my_entry->pagetable);
     }
     _interrupt_set_state(intr_status);
 

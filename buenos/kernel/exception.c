@@ -55,10 +55,12 @@
 
 static void print_tlb_debug(void)
 {
-   tlb_exception_state_t tes;
-   _tlb_get_exception_state(&tes);
+    tlb_exception_state_t tes;
+    _tlb_get_exception_state(&tes);
 
-   kprintf("TLB exception. Details:\n"
+    //kprintf("cur thread pagetable size %d\n", thread_get_current_thread_entry()->pagetable->valid_count);
+    
+    kprintf("TLB exception. Details:\n"
            "Failed Virtual Address: 0x%8.8x\n"
            "Virtual Page Number:    0x%8.8x\n"
            "ASID (Thread number):   %d\n",
@@ -89,6 +91,29 @@ void kernel_exception_handle(int exception)
     thread_table_t *my_entry;
 
     my_entry = thread_get_current_thread_entry();
+    
+    #ifdef CHANGED_4
+    // TODO do we have a pagetable?!
+    switch(exception) {
+        uint32_t i;
+        case EXCEPTION_TLBM:
+            print_tlb_debug();
+            KERNEL_PANIC("TLB Modification: not handled yet");
+            break;
+        case EXCEPTION_TLBL:
+            if (my_entry->pagetable == NULL) {
+                kprintf("labbalalabba\n");
+                print_tlb_debug();
+            }
+            for (i = 0; i < my_entry->pagetable->valid_count; i++) {
+            }
+            goto exit; 
+        case EXCEPTION_TLBS:
+            print_tlb_debug();
+            KERNEL_PANIC("TLB Store: not handled yet");
+            break;
+    }
+    #endif
 
     if(my_entry->on_kernel_copy)
     {
@@ -100,6 +125,8 @@ void kernel_exception_handle(int exception)
     #endif
 
     switch(exception) {
+        #ifdef CHANGED_4
+        #else
         case EXCEPTION_TLBM:
             print_tlb_debug();
             KERNEL_PANIC("TLB Modification: not handled yet");
@@ -112,6 +139,7 @@ void kernel_exception_handle(int exception)
             print_tlb_debug();
             KERNEL_PANIC("TLB Store: not handled yet");
             break;
+        #endif
         case EXCEPTION_ADDRL:
             print_tlb_debug();
             KERNEL_PANIC("Address Error Load: not handled yet");

@@ -65,18 +65,22 @@ void tlb_store_exception(void)
 
 void tlb_fill(pagetable_t *pagetable)
 {
-    #ifdef CHANGED_4
-    KERNEL_PANIC("tlb_fill called!\n");
-    #endif
     if(pagetable == NULL)
 	return;
 
+    #ifdef CHANGED_4
+    #else
     /* Check that the pagetable can fit into TLB. This is needed until
      we have proper VM system, because the whole pagetable must fit
      into TLB. */
     KERNEL_ASSERT(pagetable->valid_count <= (_tlb_get_maxindex()+1));
+    #endif
 
+    #ifdef CHANGED_4
+    _tlb_write(pagetable->entries, 0, MIN(pagetable->valid_count, _tlb_get_maxindex()+1));
+    #else
     _tlb_write(pagetable->entries, 0, pagetable->valid_count);
+    #endif
 
     /* Set ASID field in Co-Processor 0 to match thread ID so that
        only entries with the ASID of the current thread will match in

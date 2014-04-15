@@ -188,7 +188,7 @@ void interrupt_handle(uint32_t cause) {
         scheduler_schedule();
         
         #ifdef CHANGED_4
-        _tlb_set_asid(thread_get_current_thread_entry()->pagetable->ASID);
+        _tlb_set_asid(thread_get_current_thread());
         #else
         /* Until we have proper VM we must manually fill
            the TLB with pagetable entries before running code using
