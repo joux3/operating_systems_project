@@ -77,10 +77,28 @@ void user_exception_handle(int exception)
             syscall_handle(my_entry->user_context);
             _interrupt_disable();
         } else {
-            kprintf("Exception %d occured in userland process %d\n", exception, thread_get_current_process());
-            _interrupt_enable();
-            syscall_exit_process(127); 
-            KERNEL_PANIC("Should not return from syscall_exit\n");
+            #ifdef CHANGED_4
+            int handled = 0;
+            switch(exception) {
+                case EXCEPTION_TLBM:
+                    handled = tlb_modified_exception() == 1;
+                    break;
+                case EXCEPTION_TLBL:
+                    handled = tlb_load_exception() == 1;
+                    break;
+                case EXCEPTION_TLBS:
+                    handled = tlb_store_exception() == 1;
+                    break;
+            }
+            if (!handled) {
+            #endif
+                kprintf("Exception %d occured in userland process %d\n", exception, thread_get_current_process());
+                _interrupt_enable();
+                syscall_exit_process(127); 
+                KERNEL_PANIC("Should not return from syscall_exit\n");
+            #ifdef CHANGED_4
+            }
+            #endif
         }
     #else
     switch(exception) {

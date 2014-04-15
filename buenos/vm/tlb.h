@@ -91,9 +91,15 @@ typedef struct {
 } tlb_exception_state_t;
 
 /* exception handlers */
+#ifdef CHANGED_4
+int tlb_modified_exception(void);
+int tlb_load_exception(void);
+int tlb_store_exception(void);
+#else
 void tlb_modified_exception(void);
 void tlb_load_exception(void);
 void tlb_store_exception(void);
+#endif
 
 /* Forward declare pagetable_t (== struct pagetable_struct_t) */
 struct pagetable_struct_t;

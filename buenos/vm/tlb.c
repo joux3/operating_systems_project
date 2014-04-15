@@ -38,7 +38,102 @@
 #include "kernel/assert.h"
 #include "vm/tlb.h"
 #include "vm/pagetable.h"
+#ifdef CHANGED_4
+#include "lib/debug.h"
+#include "kernel/thread.h"
+#include "vm/vm.h"
 
+static void print_tlb_debug(tlb_exception_state_t *tes)
+{
+    DEBUG("tlbdebug", "TLB exception. Details:\n"
+           "Failed Virtual Address: 0x%8.8x\n"
+           "Virtual Page Number:    0x%8.8x\n"
+           "ASID (Thread number):   %d\n",
+           tes->badvaddr, tes->badvpn2, tes->asid);
+}
+
+// returns 1 if handled properly
+int tlb_modified_exception(void)
+{
+    tlb_exception_state_t tes;
+    _tlb_get_exception_state(&tes);
+
+    print_tlb_debug(&tes);
+
+    KERNEL_PANIC("Unhandled TLB modified exception");
+    return -1;
+}
+
+// returns 1 if handled properly
+int tlb_load_exception(void)
+{    
+    tlb_exception_state_t tes;
+    _tlb_get_exception_state(&tes);
+
+    print_tlb_debug(&tes);
+
+    thread_table_t *my_entry = thread_get_current_thread_entry();
+    if (!my_entry->pagetable)
+        return -1;
+
+    pagetable_t *pagetable = my_entry->pagetable;
+
+    DEBUG("tlbdebug", "pagetable has %d entries\n", pagetable->valid_count);
+
+    uint32_t i;
+    for (i = 0; i < pagetable->valid_count; i++) {
+        tlb_entry_t *entry = &pagetable->entries[i]; 
+        DEBUG("tlbdebug", "entry vpn2 0x%x\n", entry->VPN2);
+        if (entry->VPN2 == tes.badvpn2) {
+            if (entry->V0 && ADDR_IS_ON_EVEN_PAGE(tes.badvaddr)) {
+                _tlb_write_random(entry);
+                return 1;
+            } else if (entry->V1 && ADDR_IS_ON_ODD_PAGE(tes.badvaddr)) {
+                _tlb_write_random(entry);
+                return 1;
+            }
+            break;
+        }
+    }
+
+    return -1;
+}
+
+// returns 1 if handled properly
+int tlb_store_exception(void)
+{
+    tlb_exception_state_t tes;
+    _tlb_get_exception_state(&tes);
+
+    print_tlb_debug(&tes);
+
+    thread_table_t *my_entry = thread_get_current_thread_entry();
+    if (!my_entry->pagetable)
+        return -1;
+
+    pagetable_t *pagetable = my_entry->pagetable;
+
+    DEBUG("tlbdebug", "pagetable has %d entries\n", pagetable->valid_count);
+
+    uint32_t i;
+    for (i = 0; i < pagetable->valid_count; i++) {
+        tlb_entry_t *entry = &pagetable->entries[i]; 
+        DEBUG("tlbdebug", "entry vpn2 0x%x\n", entry->VPN2);
+        if (entry->VPN2 == tes.badvpn2) {
+            if (entry->V0 && ADDR_IS_ON_EVEN_PAGE(tes.badvaddr)) {
+                _tlb_write_random(entry);
+                return 1;
+            } else if (entry->V1 && ADDR_IS_ON_ODD_PAGE(tes.badvaddr)) {
+                _tlb_write_random(entry);
+                return 1;
+            }
+            break;
+        }
+    }
+
+    return -1;
+}
+#else
 void tlb_modified_exception(void)
 {
     KERNEL_PANIC("Unhandled TLB modified exception");
@@ -53,6 +148,7 @@ void tlb_store_exception(void)
 {
     KERNEL_PANIC("Unhandled TLB store exception");
 }
+#endif
 
 /**
  * Fill TLB with given pagetable. This function is used to set memory

@@ -93,25 +93,20 @@ void kernel_exception_handle(int exception)
     my_entry = thread_get_current_thread_entry();
     
     #ifdef CHANGED_4
-    // TODO do we have a pagetable?!
+    int handled = 0;
     switch(exception) {
-        uint32_t i;
         case EXCEPTION_TLBM:
-            print_tlb_debug();
-            KERNEL_PANIC("TLB Modification: not handled yet");
+            handled = tlb_modified_exception() == 1;
             break;
         case EXCEPTION_TLBL:
-            if (my_entry->pagetable == NULL) {
-                kprintf("labbalalabba\n");
-                print_tlb_debug();
-            }
-            for (i = 0; i < my_entry->pagetable->valid_count; i++) {
-            }
-            goto exit; 
-        case EXCEPTION_TLBS:
-            print_tlb_debug();
-            KERNEL_PANIC("TLB Store: not handled yet");
+            handled = tlb_load_exception() == 1;
             break;
+        case EXCEPTION_TLBS:
+            handled = tlb_store_exception() == 1;
+            break;
+    }
+    if (handled) {
+        goto exit;
     }
     #endif
 
@@ -125,8 +120,6 @@ void kernel_exception_handle(int exception)
     #endif
 
     switch(exception) {
-        #ifdef CHANGED_4
-        #else
         case EXCEPTION_TLBM:
             print_tlb_debug();
             KERNEL_PANIC("TLB Modification: not handled yet");
@@ -139,7 +132,6 @@ void kernel_exception_handle(int exception)
             print_tlb_debug();
             KERNEL_PANIC("TLB Store: not handled yet");
             break;
-        #endif
         case EXCEPTION_ADDRL:
             print_tlb_debug();
             KERNEL_PANIC("Address Error Load: not handled yet");
