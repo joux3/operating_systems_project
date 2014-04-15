@@ -65,6 +65,9 @@ void tlb_store_exception(void)
 
 void tlb_fill(pagetable_t *pagetable)
 {
+    #ifdef CHANGED_4
+    KERNEL_PANIC("tlb_fill called!\n");
+    #endif
     if(pagetable == NULL)
 	return;
 

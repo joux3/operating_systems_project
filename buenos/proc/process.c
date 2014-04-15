@@ -311,7 +311,11 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
 
         new_entry->state = THREAD_FREE;
 
+        #ifdef CHANGED_4
+        _tlb_set_asid(my_entry->pagetable->ASID);
+        #else
         tlb_fill(my_entry->pagetable);
+        #endif
 
         vm_destroy_pagetable(pagetable);
 
@@ -373,7 +377,11 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
        pages fit into the TLB. After writing proper TLB exception
        handling this call should be skipped. */
     intr_status = _interrupt_disable();
+    #ifdef CHANGED_4
+    _tlb_set_asid(new_entry->pagetable->ASID);
+    #else
     tlb_fill(new_entry->pagetable);
+    #endif
     _interrupt_set_state(intr_status);
     
     /* Now we may use the virtual addresses of the segments. */
@@ -481,7 +489,11 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
     intr_status = _interrupt_disable();
     my_entry->pagetable = original_pagetable;
     if (my_entry->pagetable) {
+        #ifdef CHANGED_4
+        _tlb_set_asid(my_entry->pagetable->ASID);
+        #else
         tlb_fill(my_entry->pagetable);
+        #endif
     }
     _interrupt_set_state(intr_status);
 

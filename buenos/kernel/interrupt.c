@@ -187,6 +187,9 @@ void interrupt_handle(uint32_t cause) {
        scheduler_current_thread[this_cpu] == IDLE_THREAD_TID) {
         scheduler_schedule();
         
+        #ifdef CHANGED_4
+        _tlb_set_asid(thread_get_current_thread_entry()->pagetable->ASID);
+        #else
         /* Until we have proper VM we must manually fill
            the TLB with pagetable entries before running code using
            given pagetable. Note that this method limits pagetable
@@ -198,5 +201,6 @@ void interrupt_handle(uint32_t cause) {
            here. See the implementation of tlb_fill on details how to do that.
         */
         tlb_fill(thread_get_current_thread_entry()->pagetable);
+        #endif
     }
 }
