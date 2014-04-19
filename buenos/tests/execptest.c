@@ -9,6 +9,6 @@ int main(void) {
     char argc = 2;
     
     syscall_write(stdout, "starting execp test\n", 512);
-    int s = syscall_execp("[testi]argcat", argc, (const char**)ptrs);
+    int s = syscall_execp("[testi]argprint", argc, (const char**)ptrs);
     return s;
 }

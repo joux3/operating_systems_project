@@ -450,6 +450,12 @@ void thread_finish(void)
     /* Check that the page mappings have been cleared. */
     KERNEL_ASSERT(thread_table[my_tid].pagetable == NULL);
 
+    #ifdef CHANGED_4
+    // fully clear the TLB to make sure my entries
+    // aren't there anymore
+    tlb_clean();
+    #endif
+
     spinlock_acquire(&thread_table_slock);
     thread_table[my_tid].state = THREAD_DYING;
     spinlock_release(&thread_table_slock);

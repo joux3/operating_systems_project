@@ -40,8 +40,27 @@
 #include "vm/pagetable.h"
 #ifdef CHANGED_4
 #include "lib/debug.h"
+#include "lib/libc.h"
 #include "kernel/thread.h"
 #include "vm/vm.h"
+#include "kernel/interrupt.h"
+
+// fully clean the TLB. useful when there might be many invalid TLB entries
+void tlb_clean(void)
+{
+    interrupt_status_t intr_status;
+    intr_status = _interrupt_disable();
+
+    DEBUG("tlbdebug", "TLB: cleaning tlb\n");
+    tlb_entry_t zero_entry;
+    memoryset(&zero_entry, 0, sizeof(tlb_entry_t));
+    uint32_t i;
+    for (i = 0; i <= _tlb_get_maxindex(); i++) {
+        _tlb_write(&zero_entry, i, 1);
+    }
+
+    _interrupt_set_state(intr_status);
+}
 
 static void print_tlb_debug(tlb_exception_state_t *tes)
 {
@@ -58,7 +77,26 @@ int tlb_modified_exception(void)
     tlb_exception_state_t tes;
     _tlb_get_exception_state(&tes);
 
+    DEBUG("tlbdebug", "current thread %d\n", thread_get_current_thread());
     print_tlb_debug(&tes);
+
+    thread_table_t *my_entry = thread_get_current_thread_entry();
+    if (!my_entry->pagetable)
+        return -1;
+
+    pagetable_t *pagetable = my_entry->pagetable;
+
+    DEBUG("tlbdebug", "pagetable has %d entries\n", pagetable->valid_count);
+
+    uint32_t i;
+    for (i = 0; i < pagetable->valid_count; i++) {
+        tlb_entry_t *entry = &pagetable->entries[i]; 
+        DEBUG("tlbdebug", "entry vpn2 0x%x\n", entry->VPN2);
+        if (entry->V0)
+            DEBUG("tlbdebug", "   - PFN0 0x%x, , D0 %d\n", entry->PFN0, entry->D0);
+        if (entry->V1)
+            DEBUG("tlbdebug", "   - PFN1 0x%x, , D1 %d\n", entry->PFN1, entry->D1);
+    }
 
     KERNEL_PANIC("Unhandled TLB modified exception");
     return -1;
@@ -150,6 +188,11 @@ void tlb_store_exception(void)
 }
 #endif
 
+
+#ifdef CHANGED_4
+// Fill the TLB with the first pages from the pagetable
+// As many as pages that fit into TLB are used
+#else
 /**
  * Fill TLB with given pagetable. This function is used to set memory
  * mappings in CP0's TLB before we have a proper TLB handling system.
@@ -158,6 +201,7 @@ void tlb_store_exception(void)
  * @param pagetable Mappings to write to TLB.
  *
  */
+#endif
 
 void tlb_fill(pagetable_t *pagetable)
 {
@@ -165,6 +209,9 @@ void tlb_fill(pagetable_t *pagetable)
 	return;
 
     #ifdef CHANGED_4
+    // disable interrups to be sure that we can in one go fill and clean the TLB
+    interrupt_status_t intr_status;
+    intr_status = _interrupt_disable();
     #else
     /* Check that the pagetable can fit into TLB. This is needed until
      we have proper VM system, because the whole pagetable must fit
@@ -173,13 +220,38 @@ void tlb_fill(pagetable_t *pagetable)
     #endif
 
     #ifdef CHANGED_4
+    uint32_t i;
+    DEBUG("tlbdebug", "IN TLB FILL, ASID %d\n", pagetable->ASID);
+    for (i = 0; i < pagetable->valid_count; i++) {
+        tlb_entry_t *entry = &pagetable->entries[i]; 
+        DEBUG("tlbdebug", "entry vpn2 0x%x\n", entry->VPN2);
+        if (entry->V0)
+            DEBUG("tlbdebug", "   - PFN0 0x%x, , D0 %d\n", entry->PFN0, entry->D0);
+        if (entry->V1)
+            DEBUG("tlbdebug", "   - PFN1 0x%x, , D1 %d\n", entry->PFN1, entry->D1);
+    }
     _tlb_write(pagetable->entries, 0, MIN(pagetable->valid_count, _tlb_get_maxindex()+1));
     #else
     _tlb_write(pagetable->entries, 0, pagetable->valid_count);
+    #endif
+
+    #ifdef CHANGED_4
+    // tlb_fill gets called in places, where something funky might be happening with the tlb:
+    // - ownership of a pagetable might be moving between threads etc
+    // so clean the rest of the TLB to avoid invalid entries
+    tlb_entry_t zero_entry;
+    memoryset(&zero_entry, 0, sizeof(tlb_entry_t));
+    for (i = pagetable->valid_count; i <= _tlb_get_maxindex(); i++) {
+        _tlb_write(&zero_entry, i, 1);
+    }
     #endif
 
     /* Set ASID field in Co-Processor 0 to match thread ID so that
        only entries with the ASID of the current thread will match in
        the TLB hardware. */
     _tlb_set_asid(pagetable->ASID);
+
+    #ifdef CHANGED_4
+    _interrupt_set_state(intr_status);
+    #endif
 }

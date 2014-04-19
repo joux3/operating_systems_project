@@ -115,5 +115,8 @@ int _tlb_read(tlb_entry_t *entries, uint32_t index, uint32_t num);
 int _tlb_write(tlb_entry_t *entries, uint32_t index, uint32_t num);
 void _tlb_write_random(tlb_entry_t *entry);
 
+#ifdef CHANGED_4
+void tlb_clean(void);
+#endif
 
 #endif /* BUENOS_VM_TLB_H */

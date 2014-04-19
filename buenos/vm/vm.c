@@ -91,7 +91,7 @@ pagetable_t *vm_create_pagetable(uint32_t asid)
 
     addr = pagepool_get_phys_page();
     if(addr == 0) {
-	return NULL;
+        return NULL;
     }
 
     /* Convert physical page address to kernel unmapped
@@ -138,8 +138,8 @@ void vm_destroy_pagetable(pagetable_t *pagetable)
  */
 
 void vm_map(pagetable_t *pagetable, 
-	    uint32_t physaddr, 
-	    uint32_t vaddr,
+            uint32_t physaddr, 
+            uint32_t vaddr,
             int dirty)
 {
     unsigned int i;
@@ -147,44 +147,44 @@ void vm_map(pagetable_t *pagetable,
     KERNEL_ASSERT(dirty == 0 || dirty == 1);
 
     for(i=0; i<pagetable->valid_count; i++) {
-	if(pagetable->entries[i].VPN2 == (vaddr >> 13)) {
-	    /* TLB has separate mappings for even and odd 
-	       virtual pages. Let's handle them separately here,
-	       and we have much more fun when updating the TLB later.*/
-	    if(ADDR_IS_ON_EVEN_PAGE(vaddr)) {
-		if(pagetable->entries[i].V0 == 1) {
-		    KERNEL_PANIC("Tried to re-map same virtual page");
-		} else {
-		    /* Map the page on a pair entry */
-		    pagetable->entries[i].PFN0 = physaddr >> 12;
-		    pagetable->entries[i].V0 = 1;
-		    pagetable->entries[i].G0 = 0;
-		    pagetable->entries[i].D0 = dirty;
-		    return;
-		}
-	    } else {
-		if(pagetable->entries[i].V1 == 1) {
-		    KERNEL_PANIC("Tried to re-map same virtual page");
-		} else {
-		    /* Map the page on a pair entry */
-		    pagetable->entries[i].PFN1 = physaddr >> 12;
-		    pagetable->entries[i].V1 = 1;
-		    pagetable->entries[i].G1 = 0;
-		    pagetable->entries[i].D1 = dirty;
-		    return;
-		}
-	    }
-	}
+        if(pagetable->entries[i].VPN2 == (vaddr >> 13)) {
+            /* TLB has separate mappings for even and odd 
+               virtual pages. Let's handle them separately here,
+               and we have much more fun when updating the TLB later.*/
+            if(ADDR_IS_ON_EVEN_PAGE(vaddr)) {
+                if(pagetable->entries[i].V0 == 1) {
+                    KERNEL_PANIC("Tried to re-map same virtual page");
+                } else {
+                    /* Map the page on a pair entry */
+                    pagetable->entries[i].PFN0 = physaddr >> 12;
+                    pagetable->entries[i].V0 = 1;
+                    pagetable->entries[i].G0 = 0;
+                    pagetable->entries[i].D0 = dirty;
+                    return;
+                }
+            } else {
+                if(pagetable->entries[i].V1 == 1) {
+                    KERNEL_PANIC("Tried to re-map same virtual page");
+                } else {
+                    /* Map the page on a pair entry */
+                    pagetable->entries[i].PFN1 = physaddr >> 12;
+                    pagetable->entries[i].V1 = 1;
+                    pagetable->entries[i].G1 = 0;
+                    pagetable->entries[i].D1 = dirty;
+                    return;
+                }
+            }
+        }
     }
     /* No previous or pairing mapping was found */
 
     /* Make sure that pagetable is not full */
     if(pagetable->valid_count >= PAGETABLE_ENTRIES) {
-	kprintf("Thread with ASID=%d run out of pagetable mapping entries\n",
-		pagetable->ASID);
-	kprintf("during an attempt to map vaddr 0x%8.8x => phys 0x%8.8x.\n",
-		vaddr, physaddr);
-	KERNEL_PANIC("Thread run out of pagetable mapping entries.");
+        kprintf("Thread with ASID=%d run out of pagetable mapping entries\n",
+                pagetable->ASID);
+        kprintf("during an attempt to map vaddr 0x%8.8x => phys 0x%8.8x.\n",
+                vaddr, physaddr);
+        KERNEL_PANIC("Thread run out of pagetable mapping entries.");
     }
 
     /* Map the page on a new entry */
@@ -193,17 +193,17 @@ void vm_map(pagetable_t *pagetable,
     pagetable->entries[pagetable->valid_count].ASID = pagetable->ASID;
 
     if(ADDR_IS_ON_EVEN_PAGE(vaddr)) {
-	pagetable->entries[pagetable->valid_count].PFN0 = physaddr >> 12;
-	pagetable->entries[pagetable->valid_count].D0   = dirty;
-	pagetable->entries[pagetable->valid_count].V0   = 1;
-	pagetable->entries[pagetable->valid_count].G0   = 0;
-	pagetable->entries[pagetable->valid_count].V1   = 0;
+        pagetable->entries[pagetable->valid_count].PFN0 = physaddr >> 12;
+        pagetable->entries[pagetable->valid_count].D0   = dirty;
+        pagetable->entries[pagetable->valid_count].V0   = 1;
+        pagetable->entries[pagetable->valid_count].G0   = 0;
+        pagetable->entries[pagetable->valid_count].V1   = 0;
     } else {
-	pagetable->entries[pagetable->valid_count].PFN1 = physaddr >> 12;
-	pagetable->entries[pagetable->valid_count].D1   = dirty;
-	pagetable->entries[pagetable->valid_count].V1   = 1;
-	pagetable->entries[pagetable->valid_count].G1   = 0;
-	pagetable->entries[pagetable->valid_count].V0   = 0;
+        pagetable->entries[pagetable->valid_count].PFN1 = physaddr >> 12;
+        pagetable->entries[pagetable->valid_count].D1   = dirty;
+        pagetable->entries[pagetable->valid_count].V1   = 1;
+        pagetable->entries[pagetable->valid_count].G1   = 0;
+        pagetable->entries[pagetable->valid_count].V0   = 0;
     }
 
     pagetable->valid_count++;
@@ -245,26 +245,26 @@ void vm_set_dirty(pagetable_t *pagetable, uint32_t vaddr, int dirty)
     KERNEL_ASSERT(dirty == 0 || dirty == 1);
 
     for(i=0; i<pagetable->valid_count; i++) {
-	if(pagetable->entries[i].VPN2 == (vaddr >> 13)) {
+        if(pagetable->entries[i].VPN2 == (vaddr >> 13)) {
             /* Check whether this is an even or odd page */
-	    if(ADDR_IS_ON_EVEN_PAGE(vaddr)) {
-		if(pagetable->entries[i].V0 == 0) {
-		    KERNEL_PANIC("Tried to set dirty bit of an unmapped "
+            if(ADDR_IS_ON_EVEN_PAGE(vaddr)) {
+                if(pagetable->entries[i].V0 == 0) {
+                    KERNEL_PANIC("Tried to set dirty bit of an unmapped "
                                  "entry");
-		} else {
-		    pagetable->entries[i].D0 = dirty;
-		    return;
-		}
-	    } else {
-		if(pagetable->entries[i].V1 == 0) {
-		    KERNEL_PANIC("Tried to set dirty bit of an unmapped "
+                } else {
+                    pagetable->entries[i].D0 = dirty;
+                    return;
+                }
+            } else {
+                if(pagetable->entries[i].V1 == 0) {
+                    KERNEL_PANIC("Tried to set dirty bit of an unmapped "
                                  "entry");
-		} else {
-		    pagetable->entries[i].D1 = dirty;
-		    return;
-		}
-	    }
-	}
+                } else {
+                    pagetable->entries[i].D1 = dirty;
+                    return;
+                }
+            }
+        }
     }
     /* No mapping was found */
 
