@@ -42,6 +42,7 @@
 #ifdef CHANGED_4
 #include "drivers/device.h"
 #include "drivers/gbd.h"
+#include "lib/debug.h"
 #endif
 
 /** @name Virtual memory system
@@ -63,6 +64,8 @@
 gbd_t *swap_gbd;
 uint32_t virtual_pool_size;
 virtual_page_t *virtual_pool;
+uint32_t phys_pool_size;
+phys_page_t *phys_pool;
 #endif
 
 
@@ -100,10 +103,30 @@ void vm_init(void)
     // reserve enough memory for the virtual page entries 
     // (one virtual page per disk block)
     virtual_pool = (virtual_page_t*)kmalloc(virtual_pool_size * sizeof(virtual_page_t));
+    if (!virtual_pool) 
+        KERNEL_PANIC("Not enough memory left for virtual page pool data!");
+    // statically reserve phys pool entries from the free memory left
+    phys_pool_size = (kmalloc_get_numpages() - kmalloc_get_reserved_pages())/2; 
+    phys_pool = (phys_page_t*)kmalloc(phys_pool_size * sizeof(phys_page_t)); 
+    if (!phys_pool)
+        KERNEL_PANIC("Not enough memory left for physical page pool data!");
+        
     #endif
 
     pagepool_init();
     kmalloc_disable();
+
+    #ifdef CHANGED_4
+    memoryset(phys_pool, 0, phys_pool_size * sizeof(phys_page_t));
+    // dynamically reserve the physical pages from pagepool
+    // (just for the page alignment, we don't really need the freeing)
+    for (i = 0; (uint32_t)i < phys_pool_size; i++) {
+        phys_pool[i].phys_address = pagepool_get_phys_page();
+        if (!phys_pool[i].phys_address)
+            KERNEL_PANIC("Not enough memory left for physical pages!");
+    }
+    DEBUG("swapdebug", "SWAP: Allocated a total of %d physical pages for paging\n", phys_pool_size);
+    #endif
 }
 
 /**
