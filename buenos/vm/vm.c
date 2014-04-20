@@ -39,6 +39,10 @@
 #include "vm/pagepool.h"
 #include "kernel/kmalloc.h"
 #include "kernel/assert.h"
+#ifdef CHANGED_4
+#include "drivers/device.h"
+#include "drivers/gbd.h"
+#endif
 
 /** @name Virtual memory system
  *
@@ -55,6 +59,11 @@
 #define ADDR_IS_ON_EVEN_PAGE(addr) (!((addr) & 0x00001000))  
 #endif
 
+#ifdef CHANGED_4
+gbd_t *swap_gbd;
+uint32_t virtual_pool_size;
+#endif
+
 
 /**
  * Initializes virtual memory system. Initialization consists of page
@@ -69,6 +78,27 @@ void vm_init(void)
        Any extensions to pagetables should also provide this information
        in this form. */
     KERNEL_ASSERT(sizeof(tlb_entry_t) == 12);
+
+    #ifdef CHANGED_4
+    // find out the swap gbd by looking for disk with block size PAGE_SIZE
+
+    // also reserve enough memory for the virtual page entries 
+    // (one virtual page per disk block)
+    int i = 0;
+    while (1) {
+        device_t *disk = device_get(YAMS_TYPECODE_DISK, i);
+        if (disk == NULL)
+            KERNEL_PANIC("No swap disk found!");
+        swap_gbd = disk->generic_device;
+        if (swap_gbd->block_size(swap_gbd) == PAGE_SIZE) {
+            virtual_pool_size = swap_gbd->total_blocks(swap_gbd);
+            kprintf("Pagepool: using the disk at 0x%x for swap, %d virtual pages\n", 
+                    disk->io_address, virtual_pool_size);
+            break;
+        }
+        i++;
+    }
+    #endif
 
     pagepool_init();
     kmalloc_disable();

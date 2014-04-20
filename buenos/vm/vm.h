@@ -47,6 +47,9 @@
 #else
 #endif
 
+#ifdef CHANGED_4
+#endif
+
 void vm_init(void);
 
 pagetable_t *vm_create_pagetable(uint32_t asid);
