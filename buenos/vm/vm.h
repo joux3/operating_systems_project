@@ -48,6 +48,19 @@
 #endif
 
 #ifdef CHANGED_4
+
+typedef struct virtual_page_struct_t {
+    uint8_t in_use;
+    int phys_page;
+} virtual_page_t;
+
+typedef struct phys_page_struct_t {
+    uint32_t phys_address;
+    uint32_t ticks;
+    uint8_t in_use;
+    uint8_t dirty;
+} phys_page_t;
+
 #endif
 
 void vm_init(void);

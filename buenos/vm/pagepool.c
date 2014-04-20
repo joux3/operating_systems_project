@@ -115,12 +115,12 @@ uint32_t pagepool_get_phys_page(void)
     spinlock_acquire(&pagepool_slock);
     
     if (pagepool_num_free_pages > 0) {
-	i = bitmap_findnset(pagepool_free_pages,pagepool_num_pages);
-	pagepool_num_free_pages--;
+        i = bitmap_findnset(pagepool_free_pages,pagepool_num_pages);
+        pagepool_num_free_pages--;
 
         /* There should have been a free page. Check that the pagepool
            internal variables are in synch. */
-	KERNEL_ASSERT(i >= 0 && pagepool_num_free_pages >= 0);
+        KERNEL_ASSERT(i >= 0 && pagepool_num_free_pages >= 0);
     } else {
         i = 0;
     }

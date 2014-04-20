@@ -77,7 +77,7 @@ int kmalloc_get_numpages()
     /* Find MemInfo meta device */
     for(i = 0; i < YAMS_MAX_DEVICES; i++) {
         if (io_desc->type == 0x101) {
-	    num_pages = (*(uint32_t *)io_desc->io_area_base);
+            num_pages = (*(uint32_t *)io_desc->io_area_base);
             break;
         }
         io_desc++;
@@ -147,12 +147,12 @@ void kmalloc_init(void)
     }
 
     kprintf("Kernel size is 0x%.8x (%d) bytes\n", 
-	    (free_area_start - KERNEL_BOOT_ADDRESS),
-	    (free_area_start - KERNEL_BOOT_ADDRESS));
+            (free_area_start - KERNEL_BOOT_ADDRESS),
+            (free_area_start - KERNEL_BOOT_ADDRESS));
 
     kprintf("System memory size is 0x%.8x (%d) bytes\n",
-	    system_memory_size, system_memory_size);
-	    
+            system_memory_size, system_memory_size);
+            
 }
 
 /**
@@ -179,10 +179,10 @@ void *kmalloc(int bytes)
 
     /* bytes == 0 may be useful for aligning memory so it is allowed */
     if (bytes < 0)
-	KERNEL_PANIC("Attempting to kmalloc negative amount of bytes\n");
+        KERNEL_PANIC("Attempting to kmalloc negative amount of bytes\n");
 
     if (free_area_start + bytes > memory_end)
-	KERNEL_PANIC("Out of memory\n");
+        KERNEL_PANIC("Out of memory\n");
 
     res = free_area_start;
 

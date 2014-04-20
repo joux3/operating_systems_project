@@ -62,6 +62,7 @@
 #ifdef CHANGED_4
 gbd_t *swap_gbd;
 uint32_t virtual_pool_size;
+virtual_page_t *virtual_pool;
 #endif
 
 
@@ -81,9 +82,6 @@ void vm_init(void)
 
     #ifdef CHANGED_4
     // find out the swap gbd by looking for disk with block size PAGE_SIZE
-
-    // also reserve enough memory for the virtual page entries 
-    // (one virtual page per disk block)
     int i = 0;
     while (1) {
         device_t *disk = device_get(YAMS_TYPECODE_DISK, i);
@@ -98,6 +96,10 @@ void vm_init(void)
         }
         i++;
     }
+
+    // reserve enough memory for the virtual page entries 
+    // (one virtual page per disk block)
+    virtual_pool = (virtual_page_t*)kmalloc(virtual_pool_size * sizeof(virtual_page_t));
     #endif
 
     pagepool_init();
