@@ -384,6 +384,41 @@ int process_join(int process) {
 
 #endif
 
+#ifdef CHANGED_4
+void *memlimit(void *heap_end) 
+{
+    pagetable_t *pagetable = thread_get_current_thread_entry()->pagetable;
+    if (!pagetable) 
+        return NULL;
+
+    uint32_t new_limit = (uint32_t)heap_end;
+    
+    // just return the current memlimit
+    if (heap_end == NULL)
+        return (void*)pagetable->memlimit;
+        
+    if (new_limit > pagetable->memlimit) {
+        DEBUG("memlimit", "Moving memlimit up...");
+        while((pagetable->memlimit & PAGE_SIZE_MASK) < (new_limit & PAGE_SIZE_MASK)) {
+            if (pagetable->valid_count == PAGETABLE_ENTRIES) // pagetable full
+                return NULL; // TODO: free the pages we successfully got before. that can be done by using the lowering memlimit code
+            int new_page = vm_get_virtual_page();
+            if (new_page < 0)
+                return NULL; // TODO: free the pages we successfully got before. that can be done by using the lowering memlimit code
+            pagetable->memlimit += PAGE_SIZE;
+            vm_map(pagetable, new_page, pagetable->memlimit & PAGE_SIZE_MASK);
+            DEBUG("memlimit", " - mapped 0x%x -> virtual page %d\n", pagetable->memlimit & PAGE_SIZE_MASK, new_page);
+        }
+        // put it where the userland wanted it even if we actually allocate pages
+        pagetable->memlimit = new_limit;
+        return (void*)new_limit;
+    } else {
+        KERNEL_PANIC("lowering memlimit not supported yet");
+    }
+    return NULL;
+}
+#endif
+
 /**
  * Handle system calls. Interrupts are enabled when this function is
  * called.
@@ -449,6 +484,11 @@ void syscall_handle(context_t *user_context)
             break;
         case SYSCALL_DELETE:
             result = remove_file((char*)(user_context->cpu_regs[MIPS_REGISTER_A1]));
+            break;
+    #endif
+    #ifdef CHANGED_4
+        case SYSCALL_MEMLIMIT:
+            result = (int)memlimit((void*)(user_context->cpu_regs[MIPS_REGISTER_A1]));
             break;
     #endif
     default: 
