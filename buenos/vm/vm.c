@@ -197,6 +197,20 @@ void vm_free_virtual_page(int virtual_page)
     _interrupt_set_state(intr_status);
 }
 
+// sets the corresponding phys page of this virtual page as dirty
+void vm_virtual_page_modified(int virtual_page)
+{
+    KERNEL_ASSERT(virtual_page >= 0 && virtual_page < (int)virtual_pool_size);
+    
+    virtual_page_t *page = &virtual_pool[virtual_page];
+    KERNEL_ASSERT(page->phys_page >= 0);
+    phys_page_t *phys_page = &phys_pool[page->phys_page];
+    KERNEL_ASSERT(phys_page->state == PAGE_IN_USE);
+    KERNEL_ASSERT(phys_page->dirty == 0);
+
+    phys_page->dirty = 1;
+}
+
 #endif
 
 

@@ -92,6 +92,7 @@ void vm_destroy_pagetable(pagetable_t *pagetable);
 #ifdef CHANGED_4
 int vm_get_virtual_page();
 void vm_free_virtual_page(int virtual_page);
+void vm_virtual_page_modified(int virtual_page);
 // TODO: we don't support write protected pages
 void vm_map(pagetable_t *pagetable, int virtual_page, uint32_t vaddr);
 #else

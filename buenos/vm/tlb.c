@@ -86,19 +86,25 @@ int tlb_modified_exception(void)
 
     pagetable_t *pagetable = my_entry->pagetable;
 
-    DEBUG("tlbdebug", "pagetable has %d entries\n", pagetable->valid_count);
-
     uint32_t i;
+    // go through the pagetable, find the virtual page and
+    // mark it as dirty in the phys page table
     for (i = 0; i < pagetable->valid_count; i++) {
-        tlb_entry_t *entry = &pagetable->entries[i]; 
-        DEBUG("tlbdebug", "entry vpn2 0x%x\n", entry->VPN2);
-        if (entry->V0)
-            DEBUG("tlbdebug", "   - PFN0 0x%x, , D0 %d\n", entry->PFN0, entry->D0);
-        if (entry->V1)
-            DEBUG("tlbdebug", "   - PFN1 0x%x, , D1 %d\n", entry->PFN1, entry->D1);
+        pagetable_entry_t *entry = &pagetable->entries[i]; 
+        DEBUG("tlbdebug", "entry vpn 0x%x\n", entry->VPN);
+        int virtual_page = -1;
+        if (entry->even_page >= 0 && ADDR_IS_ON_EVEN_PAGE(tes.badvaddr)) {
+            virtual_page = entry->even_page; 
+        } else if (entry->odd_page >= 0 && ADDR_IS_ON_ODD_PAGE(tes.badvaddr)) {
+            virtual_page = entry->odd_page; 
+        }
+        if (virtual_page != -1) {
+            // mark the corresponding phys page as dirty
+            vm_virtual_page_modified(virtual_page);
+            return 1;
+        }
     }
 
-    KERNEL_PANIC("Unhandled TLB modified exception");
     return -1;
 }
 
