@@ -398,7 +398,7 @@ void *memlimit(void *heap_end)
         return (void*)pagetable->memlimit;
         
     if (new_limit > pagetable->memlimit) {
-        DEBUG("memlimit", "Moving memlimit up...");
+        DEBUG("memlimit", "Moving memlimit up...\n");
         while((pagetable->memlimit & PAGE_SIZE_MASK) < (new_limit & PAGE_SIZE_MASK)) {
             if (pagetable->valid_count == PAGETABLE_ENTRIES) // pagetable full
                 return NULL; // TODO: free the pages we successfully got before. that can be done by using the lowering memlimit code
@@ -409,11 +409,20 @@ void *memlimit(void *heap_end)
             vm_map(pagetable, new_page, pagetable->memlimit & PAGE_SIZE_MASK);
             DEBUG("memlimit", " - mapped 0x%x -> virtual page %d\n", pagetable->memlimit & PAGE_SIZE_MASK, new_page);
         }
-        // put it where the userland wanted it even if we actually allocate pages
+        // put it where the userland wanted it even if we actually allocate full pages
         pagetable->memlimit = new_limit;
         return (void*)new_limit;
-    } else {
-        KERNEL_PANIC("lowering memlimit not supported yet");
+    } 
+    if (new_limit < pagetable->memlimit) {
+        DEBUG("memlimit", "Moving memlimit down...\n");
+        while((pagetable->memlimit & PAGE_SIZE_MASK) > (new_limit & PAGE_SIZE_MASK)) {
+            DEBUG("memlimit", " - unmapping 0x%x\n", pagetable->memlimit & PAGE_SIZE_MASK);
+            vm_unmap(pagetable, pagetable->memlimit & PAGE_SIZE_MASK);
+            pagetable->memlimit -= PAGE_SIZE;
+        }
+        // put it where the userland wanted it even if we actually operate on pages
+        pagetable->memlimit = new_limit;
+        return (void*)new_limit;
     }
     return NULL;
 }

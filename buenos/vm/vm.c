@@ -452,7 +452,8 @@ void vm_map(pagetable_t *pagetable,
 #endif
 
 /**
- * Unmaps given virtual address from given pagetable.
+ * Unmaps given virtual address from given pagetable. Also frees 
+ * the corresponding virtual page.
  *
  * @param pagetable Page table to operate on
  *
@@ -462,10 +463,38 @@ void vm_map(pagetable_t *pagetable,
 
 void vm_unmap(pagetable_t *pagetable, uint32_t vaddr)
 {
-    pagetable = pagetable;
-    vaddr     = vaddr;
-    
-    /* Not implemented */
+    #ifdef CHANGED_4
+    uint32_t i;
+    for (i = 0; i < pagetable->valid_count; i++) {
+        if(pagetable->entries[i].VPN == (vaddr >> 13)) {
+            // free the virtual page and remove the mapping 
+            if(ADDR_IS_ON_EVEN_PAGE(vaddr)) {
+                if (pagetable->entries[i].even_page < 0) {
+                    KERNEL_PANIC("Trying to unmap a page that hasn't been mapped!");
+                } else {
+                    vm_free_virtual_page(pagetable->entries[i].even_page);
+                    pagetable->entries[i].even_page = -1;
+                }
+            } else {
+                if (pagetable->entries[i].odd_page < 0) {
+                    KERNEL_PANIC("Trying to unmap a page that hasn't been mapped!");
+                } else {
+                    vm_free_virtual_page(pagetable->entries[i].odd_page);
+                    pagetable->entries[i].odd_page = -1;
+                }
+            }
+
+            // check if we're at the end of the list
+            if (i == pagetable->valid_count - 1) {
+                // check if we can remove empty entries from the end of the list
+                while (pagetable->entries[pagetable->valid_count - 1].even_page < 0 && 
+                        pagetable->entries[pagetable->valid_count - 1].odd_page < 0) {
+                    pagetable->valid_count--;
+                }
+            }
+        }
+    }
+    #endif
 }
 
 /**
