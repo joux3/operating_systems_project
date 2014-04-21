@@ -154,6 +154,28 @@ int swap_read_block(uint32_t block, uint32_t addr) {
     return swap_gbd->read_block(swap_gbd, &req);
 }
 
+// swap the given physical page to disk
+// this should be called with interrupts disabled
+void swap_page(phys_page_t *phys_page) {
+    KERNEL_ASSERT(phys_page->state == PAGE_IN_USE);
+     
+    phys_page->state = PAGE_UNDER_IO;
+    if (phys_page->dirty) {
+        // NOTE: there's a potential concurrency problem here, TODO
+        // the process can still write the memory at phys_address
+        KERNEL_ASSERT(swap_write_block(phys_page->virtual_page, phys_page->phys_address) != 0);
+    }
+
+    // stop the phys page from being used
+    virtual_pool[phys_page->virtual_page].phys_page = -1;
+
+    // at this point the old mapping for the physical page might be in TLB, so clean it
+    // TODO: only remove the needed entry, not clean the whole table
+    tlb_clean();
+
+    phys_page->state = PAGE_FREE;
+}
+
 // finds a free virtual page and returns its id
 // returns negative if no virtual pages left
 int vm_get_virtual_page() 
@@ -243,35 +265,43 @@ void vm_ensure_page_in_memory(int virtual_page, int dirty)
     virtual_page_t *page = &virtual_pool[virtual_page];
     KERNEL_ASSERT(page->in_use);
     phys_page_t *phys_page = NULL;
-    DEBUG("swapdebug", "SWAP: ensuring virtual page %d is in memory\n", virtual_page);
     if (page->phys_page >= 0) {
         // page is already in memory, OK
         phys_page = &phys_pool[page->phys_page];
     } else {
         // find a free phys page
         uint32_t i;
+        uint32_t oldest_i = phys_pool_size;
+        uint32_t oldest_ticks = 0;
         for (i = 0; i < phys_pool_size; i++) {
             if (phys_pool[i].state == PAGE_FREE) {
                 DEBUG("swapdebug", "   - found free phys page %d\n", i);
                 page->phys_page = i;
                 phys_page = &phys_pool[i];
                 break;
+            } else if (phys_pool[i].state == PAGE_IN_USE && (oldest_i == phys_pool_size || phys_pool[i].ticks < oldest_ticks)) {
+                // keep track of the oldest phys page in use
+                oldest_i = i;
+                oldest_ticks = phys_pool[i].ticks; 
             }
         }
         if (!phys_page) {
-            // need to swap some page out
-            KERNEL_PANIC("Swap not implemented!");
+            // need to swap some page out. select the one with the oldest ticks
+            if (oldest_i == phys_pool_size)
+                KERNEL_PANIC("Need to swap out a page but none possible found!");
+            DEBUG("swapdebug", "   - swapping out phys page %d\n", oldest_i);
+            phys_page = &phys_pool[oldest_i];
+            swap_page(phys_page);
+            KERNEL_ASSERT(phys_page->state == PAGE_FREE);
+            page->phys_page = oldest_i;
         }
 
+        DEBUG("swapdebug", "   - swapping in page %d\n", virtual_page);
         phys_page->virtual_page = virtual_page;
         phys_page->state = PAGE_UNDER_IO;
 
-        // enable interrupts for disk read
-        intr_state = _interrupt_enable();  
-
         KERNEL_ASSERT(swap_read_block(virtual_page, phys_page->phys_address) != 0);
 
-        _interrupt_set_state(intr_state);
         phys_page->state = PAGE_IN_USE;
     }
 
