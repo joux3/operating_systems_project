@@ -303,10 +303,13 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
     invalid = invalid || !elf_parse_header(&elf, file);
     /* Trivial and naive sanity check for entry point: */
     invalid = invalid || (elf.entry_point < PAGE_SIZE);
+    #ifdef CHANGED_4
+    #else
     /* Calculate the number of pages needed by the whole process
        (including userland stack). Since we don't have proper tlb
        handling code, all these pages must fit into TLB. */
     invalid = invalid || (elf.ro_pages + elf.rw_pages + CONFIG_USERLAND_STACK_SIZE > _tlb_get_maxindex() + 1);
+    #endif
     if (invalid) {
         intr_status = _interrupt_disable();
         my_entry->pagetable = original_pagetable;
@@ -390,6 +393,11 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
             DEBUG("processdebug", "skipping already mapped %x\n", elf.rw_vaddr + i*PAGE_SIZE);
         }
     }
+
+    #ifdef CHANGED_4
+    // calcualte the current memlimit
+    new_entry->pagetable->memlimit = MAX(elf.rw_vaddr + elf.rw_size, elf.ro_vaddr + elf.ro_size);;
+    #endif
 
     DEBUG("processdebug", "filling tlb for new process\n");
 

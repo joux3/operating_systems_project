@@ -54,9 +54,14 @@ typedef struct pagetable_entry_struct_t {
 
 #define PAGETABLE_ENTRIES 340
 typedef struct pagetable_struct_t {
+    /* Address space identifier. We use Thread Ids in Buenos. */
     uint32_t ASID;
+    /* Number of valid consecutive mappings in this pagetable. */
     uint32_t valid_count;
+    /* Actual virtual memory mapping entries*/
     pagetable_entry_t entries[PAGETABLE_ENTRIES];
+    /* memlimit associated with the process */
+    uint32_t memlimit;
 } pagetable_t;
 
 #else
