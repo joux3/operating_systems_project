@@ -40,11 +40,31 @@
 #include "lib/libc.h"
 #include "vm/tlb.h"
 
+#ifdef CHANGED_4
+
+// contains virtual address to virtual pool mappings for two pages
+typedef struct pagetable_entry_struct_t {
+    // the virtual page pair number, length 19 bits
+    uint32_t VPN;  
+    // virtual page number for the even VPN + 0 page. negative if empty
+    int even_page;
+    // virtual page number for the even VPN + 1 page. negative if empty
+    int odd_page;
+} pagetable_entry_t;
+
+#define PAGETABLE_ENTRIES 340
+typedef struct pagetable_struct_t {
+    uint32_t ASID;
+    uint32_t valid_count;
+    pagetable_entry_t entries[PAGETABLE_ENTRIES];
+} pagetable_t;
+
+#else
 /* Number of mapping entries in one pagetable. This is the number
    of entries that fits on a single hardware memory page (4k). */
 #define PAGETABLE_ENTRIES 340
-
 /* A pagetable. This structure fits on one physical page (4k). */
+
 typedef struct pagetable_struct_t{
     /* Address space identifier. We use Thread Ids in Buenos. */
     uint32_t ASID;
@@ -53,5 +73,7 @@ typedef struct pagetable_struct_t{
     /* Actual virtual memory mapping entries*/
     tlb_entry_t entries[PAGETABLE_ENTRIES];
 } pagetable_t;
+#endif
+
 
 #endif /* BUENOS_VM_PAGETABLE_H */

@@ -242,7 +242,10 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
     process_id_t process_id;
     pagetable_t *pagetable;
     pagetable_t *original_pagetable;
+    #ifdef CHANGED_4
+    #else
     uint32_t phys_page;
+    #endif
     uint32_t stack_bottom, stack_top;
     elf_info_t elf;
     openfile_t file;
@@ -322,21 +325,29 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
 
     /* Allocate and map stack */
     for(i = 0; i < CONFIG_USERLAND_STACK_SIZE; i++) {
-        phys_page = pagepool_get_phys_page();
-        KERNEL_ASSERT(phys_page != 0);
-        vm_map(new_entry->pagetable, phys_page, 
-               (USERLAND_STACK_TOP & PAGE_SIZE_MASK) - i*PAGE_SIZE, 1);
+        #ifdef CHANGED_4
+        int virtual_page = vm_get_virtual_page();
+        KERNEL_ASSERT(virtual_page != -1);
+        vm_map(new_entry->pagetable, virtual_page, 
+               (USERLAND_STACK_TOP & PAGE_SIZE_MASK) - i*PAGE_SIZE);
+        #else
+        #error
+        #endif
     }
 
     /* Allocate and map pages for the segments. We assume that
        segments begin at page boundary. (The linker script in tests
        directory creates this kind of segments) */
     for(i = 0; i < (int)elf.ro_pages; i++) {
-        phys_page = pagepool_get_phys_page();
-        KERNEL_ASSERT(phys_page != 0);
-        DEBUG("processdebug", "mapping %x -> %x\n", elf.ro_vaddr + i*PAGE_SIZE, phys_page);
-        vm_map(new_entry->pagetable, phys_page, 
-               elf.ro_vaddr + i*PAGE_SIZE, 1);
+        #if CHANGED_4
+        int virtual_page = vm_get_virtual_page();
+        KERNEL_ASSERT(virtual_page != -1);
+        DEBUG("processdebug", "mapping %x -> %x\n", elf.ro_vaddr + i*PAGE_SIZE, virtual_page);
+        vm_map(new_entry->pagetable, virtual_page, 
+               elf.ro_vaddr + i*PAGE_SIZE);
+        #else
+        #error
+        #endif
     }
 
     for(i = 0; i < (int)elf.rw_pages; i++) {
@@ -345,23 +356,31 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
         int j;   
         int mapped = 0;
         for (j = 0; j < (int)new_entry->pagetable->valid_count; j++) {
-            tlb_entry_t *tlb_entry = &new_entry->pagetable->entries[j];
-            if (tlb_entry->VPN2 == ((elf.rw_vaddr + i*PAGE_SIZE) >> 13)) {
+            #ifdef CHANGED_4
+            pagetable_entry_t *pagetable_entry = &new_entry->pagetable->entries[j];
+            if (pagetable_entry->VPN == ((elf.rw_vaddr + i*PAGE_SIZE) >> 13)) {
                 if (ADDR_IS_ON_EVEN_PAGE(elf.rw_vaddr + i*PAGE_SIZE)) {
-                    mapped = tlb_entry->V0;
+                    mapped = pagetable_entry->even_page != -1;
                     break;
                 } else {
-                    mapped = tlb_entry->V1;
+                    mapped = pagetable_entry->odd_page != -1;
                     break;
                 }
             }
+            #else
+            #error
+            #endif
         }
         if (!mapped) {
-            phys_page = pagepool_get_phys_page();
-            KERNEL_ASSERT(phys_page != 0);
-            DEBUG("processdebug", "mapping %x -> %x\n", elf.rw_vaddr + i*PAGE_SIZE, phys_page);
-            vm_map(new_entry->pagetable, phys_page, 
-                   elf.rw_vaddr + i*PAGE_SIZE, 1);
+            #ifdef CHANGED_4
+            int virtual_page = vm_get_virtual_page();
+            KERNEL_ASSERT(virtual_page != 0);
+            DEBUG("processdebug", "mapping %x -> %x\n", elf.rw_vaddr + i*PAGE_SIZE, virtual_page);
+            vm_map(new_entry->pagetable, virtual_page, 
+                   elf.rw_vaddr + i*PAGE_SIZE);
+            #else
+            #error
+            #endif
         } else {
             DEBUG("processdebug", "skipping already mapped %x\n", elf.rw_vaddr + i*PAGE_SIZE);
         }
@@ -471,9 +490,12 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
 
     // set asid for pagetable on new thread
     pagetable->ASID = thread_id;
+    #ifdef CHANGED_4
+    #else
     for (i = 0; i < (int)pagetable->valid_count; i++) {
         pagetable->entries[i].ASID = thread_id;
     }
+    #endif
 
     stringcopy(process_table[process_id].name, executable, 32);
     process_table[process_id].state = PROCESS_RUNNING;

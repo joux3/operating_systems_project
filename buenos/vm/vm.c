@@ -126,8 +126,78 @@ void vm_init(void)
             KERNEL_PANIC("Not enough memory left for physical pages!");
     }
     DEBUG("swapdebug", "SWAP: Allocated a total of %d physical pages for paging\n", phys_pool_size);
+
+    KERNEL_ASSERT(sizeof(pagetable_t) <= PAGE_SIZE);
     #endif
 }
+
+#ifdef CHANGED_4
+
+int swap_write_block(uint32_t block, uint32_t addr) {
+    gbd_request_t req;
+
+    req.block = block;
+    req.sem = NULL;
+    req.buf = ADDR_KERNEL_TO_PHYS(addr);
+    return swap_gbd->write_block(swap_gbd, &req);
+}
+
+// finds a free virtual page and returns its id
+// returns negative if no virtual pages left
+int vm_get_virtual_page() 
+{
+    // disable to interrupts instead of locking
+    interrupt_status_t intr_status;
+    intr_status = _interrupt_disable();
+
+    uint32_t i;
+    for (i = 0; i < virtual_pool_size; i++) {
+        if (!virtual_pool[i].in_use) {
+            virtual_pool[i].in_use = 1;
+            _interrupt_set_state(intr_status);
+        
+            virtual_pool[i].phys_page = -1;
+            // clear out the space on disk (we don't keep track of whether virtual pages have
+            // actually been in memory before or not)
+            uint32_t buffer = pagepool_get_phys_page();
+            if (!buffer) {
+                virtual_pool[i].in_use = 0;
+                return -1;
+            }
+            swap_gbd->write_block(i, buffer);
+            pagepool_free_phys_page(buffer);
+
+            return i;
+        }
+    }
+
+    _interrupt_set_state(intr_status);
+    return -1;
+}
+
+// free the given virtual page
+void vm_free_virtual_page(int virtual_page);
+{
+    KERNEL_ASSERT(virtual_page >= 0 && virtual_page < virtual_pool_size);
+
+    // disable to interrupts instead of locking
+    interrupt_status_t intr_status;
+    intr_status = _interrupt_disable();
+
+    KERNEL_ASSERT(virtual_pool[virtual_page].in_use);
+
+    if (virtual_pool[virtual_page].phys_page >= 0) {
+        int phys_page = virtual_pool[virtual_page].phys_page;
+        KERNEL_ASSERT(phys_pool[phys_page].virtual_page == virtual_page);
+        phys_pool[phys_page].in_use = 0;
+    }
+    virtual_pool[virtual_page].in_use = 0;
+
+    _interrupt_set_state(intr_status);
+}
+
+#endif
+
 
 /**
  *  Creates a new page table. Reserves memory (one page) for the table
@@ -174,6 +244,8 @@ void vm_destroy_pagetable(pagetable_t *pagetable)
     pagepool_free_phys_page(ADDR_KERNEL_TO_PHYS((uint32_t) pagetable));
 }
 
+#if CHANGED_4
+
 /**
  * Maps given virtual address to given physical address in given page
  * table. Does not modify TLB. The mapping is done in 4k chunks (pages).
@@ -183,21 +255,20 @@ void vm_destroy_pagetable(pagetable_t *pagetable)
  * @param vaddr Virtual address to map. This address should be in the
  * beginning of a page boundary (4k).
  *
- * @param physaddr Physical address to map to given virtual address.
- * This address should be in the beginning of a page boundary (4k).
- *
- * @param dirty 1 if this is a dirty page (writable), 0 if this
- * page is not dirty (write-protected). The terminology comes
- * from hardware, in reality, this is write enabling bit.
+ * @param virtual_page Virtual page to map to given virtual address.
+ * This value should have come from vm_get_virtual_page()
  *
  */
 
 void vm_map(pagetable_t *pagetable, 
-            uint32_t physaddr, 
+            int virtual_page, 
             uint32_t vaddr,
-            int dirty)
+            uint8_t write_protected)
 {
     unsigned int i;
+
+    if (virtual_page < 0)
+        KERNEL_PANIC("Tried to map an unexistant virtual page!");
 
     KERNEL_ASSERT(dirty == 0 || dirty == 1);
 
@@ -263,6 +334,10 @@ void vm_map(pagetable_t *pagetable,
 
     pagetable->valid_count++;
 }
+
+#else
+#error
+#endif
 
 /**
  * Unmaps given virtual address from given pagetable.

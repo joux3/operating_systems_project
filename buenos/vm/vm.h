@@ -50,14 +50,26 @@
 #ifdef CHANGED_4
 
 typedef struct virtual_page_struct_t {
+    // flag that tells if this virtual page is in use or free
     uint8_t in_use;
+    // index to phys_pool if this page is currently in memory. -1 otherwise
     int phys_page;
 } virtual_page_t;
 
 typedef struct phys_page_struct_t {
+    // only set at init; the actual physical page this metadata belongs to
     uint32_t phys_address;
-    uint32_t ticks;
+    // flag that tells if this physical page is in use or free
     uint8_t in_use;
+    // the variables below are only useful if in_use is 1
+
+    // the virtual page that is currently in this physical page
+    uint32_t virtual_page;
+    // last time when this page was participant in TLB exception
+    uint32_t ticks;
+    // a flag that tells if this page has had a TLB modification
+    // exception since loading from disk
+    // (i.e. do we need to write this page to disk when swapping it out?)
     uint8_t dirty;
 } phys_page_t;
 
@@ -68,8 +80,15 @@ void vm_init(void);
 pagetable_t *vm_create_pagetable(uint32_t asid);
 void vm_destroy_pagetable(pagetable_t *pagetable);
 
+#ifdef CHANGED_4
+int vm_get_virtual_page();
+void vm_free_virtual_page();
+// TODO: we don't support write protected pages
+void vm_map(pagetable_t *pagetable, int virtual_page, uint32_t vaddr);
+#else
 void vm_map(pagetable_t *pagetable, uint32_t physaddr, 
 	    uint32_t vaddr, int dirty);
+#endif
 void vm_unmap(pagetable_t *pagetable, uint32_t vaddr);
 
 void vm_set_dirty(pagetable_t *pagetable, uint32_t vaddr, int dirty);
