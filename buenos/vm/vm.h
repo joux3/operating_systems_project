@@ -56,11 +56,20 @@ typedef struct virtual_page_struct_t {
     int phys_page;
 } virtual_page_t;
 
+typedef enum {
+    PAGE_FREE,
+    PAGE_IN_USE,
+    PAGE_UNDER_IO
+} page_state_t;
+
 typedef struct phys_page_struct_t {
     // only set at init; the actual physical page this metadata belongs to
     uint32_t phys_address;
-    // flag that tells if this physical page is in use or free
-    uint8_t in_use;
+    // flag that tells if this physical page 
+    // - free
+    // - in use
+    // - in use and under IO (thus can't be paged out)
+    page_state_t state;
     // the variables below are only useful if in_use is 1
 
     // the virtual page that is currently in this physical page
@@ -82,7 +91,7 @@ void vm_destroy_pagetable(pagetable_t *pagetable);
 
 #ifdef CHANGED_4
 int vm_get_virtual_page();
-void vm_free_virtual_page();
+void vm_free_virtual_page(int virtual_page);
 // TODO: we don't support write protected pages
 void vm_map(pagetable_t *pagetable, int virtual_page, uint32_t vaddr);
 #else
@@ -90,7 +99,6 @@ void vm_map(pagetable_t *pagetable, uint32_t physaddr,
 	    uint32_t vaddr, int dirty);
 #endif
 void vm_unmap(pagetable_t *pagetable, uint32_t vaddr);
-
 void vm_set_dirty(pagetable_t *pagetable, uint32_t vaddr, int dirty);
 
 #endif /* BUENOS_VM_VM_H */

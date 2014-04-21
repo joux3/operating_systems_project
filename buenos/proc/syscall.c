@@ -102,13 +102,17 @@ void syscall_exit_process(int retval) {
     pagetable = thread_get_current_thread_entry()->pagetable;
     if (pagetable) {
         for (i = 0; i < (int)pagetable->valid_count; i++) {
-            tlb_entry_t *entry = &pagetable->entries[i];
-            if (entry->V0) {
-                pagepool_free_phys_page(entry->PFN0 << 12); 
+            #ifdef CHANGED_4
+            pagetable_entry_t *entry = &pagetable->entries[i];
+            if (entry->even_page >= 0) {
+                vm_free_virtual_page(entry->even_page); 
             }
-            if (entry->V1) {
-                pagepool_free_phys_page(entry->PFN1 << 12);
+            if (entry->odd_page >= 0) {
+                vm_free_virtual_page(entry->odd_page); 
             }
+            #else
+            #error
+            #endif
         }
     }
     vm_destroy_pagetable(pagetable);

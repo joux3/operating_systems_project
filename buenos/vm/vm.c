@@ -43,6 +43,7 @@
 #include "drivers/device.h"
 #include "drivers/gbd.h"
 #include "lib/debug.h"
+#include "kernel/interrupt.h"
 #endif
 
 /** @name Virtual memory system
@@ -117,11 +118,11 @@ void vm_init(void)
     kmalloc_disable();
 
     #ifdef CHANGED_4
-    memoryset(phys_pool, 0, phys_pool_size * sizeof(phys_page_t));
     // dynamically reserve the physical pages from pagepool
     // (just for the page alignment, we don't really need the freeing)
     for (i = 0; (uint32_t)i < phys_pool_size; i++) {
         phys_pool[i].phys_address = pagepool_get_phys_page();
+        phys_pool[i].state = PAGE_FREE;
         if (!phys_pool[i].phys_address)
             KERNEL_PANIC("Not enough memory left for physical pages!");
     }
@@ -164,7 +165,7 @@ int vm_get_virtual_page()
                 virtual_pool[i].in_use = 0;
                 return -1;
             }
-            swap_gbd->write_block(i, buffer);
+            swap_write_block(i, buffer);
             pagepool_free_phys_page(buffer);
 
             return i;
@@ -176,9 +177,9 @@ int vm_get_virtual_page()
 }
 
 // free the given virtual page
-void vm_free_virtual_page(int virtual_page);
+void vm_free_virtual_page(int virtual_page)
 {
-    KERNEL_ASSERT(virtual_page >= 0 && virtual_page < virtual_pool_size);
+    KERNEL_ASSERT(virtual_page >= 0 && virtual_page < (int)virtual_pool_size);
 
     // disable to interrupts instead of locking
     interrupt_status_t intr_status;
@@ -188,8 +189,8 @@ void vm_free_virtual_page(int virtual_page);
 
     if (virtual_pool[virtual_page].phys_page >= 0) {
         int phys_page = virtual_pool[virtual_page].phys_page;
-        KERNEL_ASSERT(phys_pool[phys_page].virtual_page == virtual_page);
-        phys_pool[phys_page].in_use = 0;
+        KERNEL_ASSERT(phys_pool[phys_page].virtual_page == (uint32_t)virtual_page);
+        phys_pool[phys_page].state = PAGE_FREE;
     }
     virtual_pool[virtual_page].in_use = 0;
 
@@ -262,41 +263,32 @@ void vm_destroy_pagetable(pagetable_t *pagetable)
 
 void vm_map(pagetable_t *pagetable, 
             int virtual_page, 
-            uint32_t vaddr,
-            uint8_t write_protected)
+            uint32_t vaddr)
 {
     unsigned int i;
 
-    if (virtual_page < 0)
+    if (virtual_page < 0 || virtual_page >= (int)virtual_pool_size)
         KERNEL_PANIC("Tried to map an unexistant virtual page!");
 
-    KERNEL_ASSERT(dirty == 0 || dirty == 1);
-
     for(i=0; i<pagetable->valid_count; i++) {
-        if(pagetable->entries[i].VPN2 == (vaddr >> 13)) {
+        if(pagetable->entries[i].VPN == (vaddr >> 13)) {
             /* TLB has separate mappings for even and odd 
                virtual pages. Let's handle them separately here,
                and we have much more fun when updating the TLB later.*/
             if(ADDR_IS_ON_EVEN_PAGE(vaddr)) {
-                if(pagetable->entries[i].V0 == 1) {
+                if(pagetable->entries[i].even_page >= 0) {
                     KERNEL_PANIC("Tried to re-map same virtual page");
                 } else {
                     /* Map the page on a pair entry */
-                    pagetable->entries[i].PFN0 = physaddr >> 12;
-                    pagetable->entries[i].V0 = 1;
-                    pagetable->entries[i].G0 = 0;
-                    pagetable->entries[i].D0 = dirty;
+                    pagetable->entries[i].even_page = virtual_page;
                     return;
                 }
             } else {
-                if(pagetable->entries[i].V1 == 1) {
+                if(pagetable->entries[i].odd_page >= 0) {
                     KERNEL_PANIC("Tried to re-map same virtual page");
                 } else {
                     /* Map the page on a pair entry */
-                    pagetable->entries[i].PFN1 = physaddr >> 12;
-                    pagetable->entries[i].V1 = 1;
-                    pagetable->entries[i].G1 = 0;
-                    pagetable->entries[i].D1 = dirty;
+                    pagetable->entries[i].odd_page = virtual_page;
                     return;
                 }
             }
@@ -308,28 +300,19 @@ void vm_map(pagetable_t *pagetable,
     if(pagetable->valid_count >= PAGETABLE_ENTRIES) {
         kprintf("Thread with ASID=%d run out of pagetable mapping entries\n",
                 pagetable->ASID);
-        kprintf("during an attempt to map vaddr 0x%8.8x => phys 0x%8.8x.\n",
-                vaddr, physaddr);
+        kprintf("during an attempt to map vaddr 0x%8.8x => virtual page %d\n",
+                vaddr, virtual_page);
         KERNEL_PANIC("Thread run out of pagetable mapping entries.");
     }
 
     /* Map the page on a new entry */
 
-    pagetable->entries[pagetable->valid_count].VPN2 = vaddr >> 13;
-    pagetable->entries[pagetable->valid_count].ASID = pagetable->ASID;
+    pagetable->entries[pagetable->valid_count].VPN = vaddr >> 13;
 
     if(ADDR_IS_ON_EVEN_PAGE(vaddr)) {
-        pagetable->entries[pagetable->valid_count].PFN0 = physaddr >> 12;
-        pagetable->entries[pagetable->valid_count].D0   = dirty;
-        pagetable->entries[pagetable->valid_count].V0   = 1;
-        pagetable->entries[pagetable->valid_count].G0   = 0;
-        pagetable->entries[pagetable->valid_count].V1   = 0;
+        pagetable->entries[pagetable->valid_count].even_page = virtual_page;
     } else {
-        pagetable->entries[pagetable->valid_count].PFN1 = physaddr >> 12;
-        pagetable->entries[pagetable->valid_count].D1   = dirty;
-        pagetable->entries[pagetable->valid_count].V1   = 1;
-        pagetable->entries[pagetable->valid_count].G1   = 0;
-        pagetable->entries[pagetable->valid_count].V0   = 0;
+        pagetable->entries[pagetable->valid_count].odd_page = virtual_page;
     }
 
     pagetable->valid_count++;
@@ -370,6 +353,12 @@ void vm_unmap(pagetable_t *pagetable, uint32_t vaddr)
  */
 void vm_set_dirty(pagetable_t *pagetable, uint32_t vaddr, int dirty)
 {
+    #ifdef CHANGED_4
+    // NOP for now as we don't support write protected virtual pages
+    pagetable = pagetable;
+    vaddr = vaddr;
+    dirty = dirty;
+    #else
     unsigned int i;
 
     KERNEL_ASSERT(dirty == 0 || dirty == 1);
@@ -399,6 +388,7 @@ void vm_set_dirty(pagetable_t *pagetable, uint32_t vaddr, int dirty)
     /* No mapping was found */
 
     KERNEL_PANIC("Tried to set dirty bit of an unmapped entry");
+    #endif
 }
 
 /** @} */
