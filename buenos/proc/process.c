@@ -314,7 +314,12 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
 
         new_entry->state = THREAD_FREE;
 
+        #ifdef CHANGED_4
+        tlb_clean();
+        _tlb_set_asid(thread_get_current_thread());
+        #else
         tlb_fill(my_entry->pagetable);
+        #endif
 
         vm_destroy_pagetable(pagetable);
 
@@ -390,8 +395,8 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
 
     intr_status = _interrupt_disable();
     #ifdef CHANGED_4
-    // fill the TLB as much as possible
-    tlb_fill(new_entry->pagetable);
+    tlb_clean();
+    _tlb_set_asid(thread_get_current_thread());
     #else
     /* Put the mapped pages into TLB. Here we again assume that the
        pages fit into the TLB. After writing proper TLB exception
@@ -508,10 +513,8 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
     intr_status = _interrupt_disable();
     my_entry->pagetable = original_pagetable;
     if (my_entry->pagetable) {
-        #ifdef CHANGED_4
-        // fill as much as possible
-        #endif
-        tlb_fill(my_entry->pagetable);
+        tlb_clean();
+        _tlb_set_asid(thread_get_current_thread());
     }
     _interrupt_set_state(intr_status);
 

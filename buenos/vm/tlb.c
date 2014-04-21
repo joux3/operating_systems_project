@@ -45,6 +45,9 @@
 #include "vm/vm.h"
 #include "kernel/interrupt.h"
 
+extern virtual_page_t *virtual_pool;
+extern phys_page_t *phys_pool;
+
 // fully clean the TLB. useful when there might be many invalid TLB entries
 void tlb_clean(void)
 {
@@ -62,13 +65,49 @@ void tlb_clean(void)
     _interrupt_set_state(intr_status);
 }
 
-static void print_tlb_debug(tlb_exception_state_t *tes)
+static void print_tlb_debug(tlb_exception_state_t *tes, char* name)
 {
-    DEBUG("tlbdebug", "TLB exception. Details:\n"
+    DEBUG("tlbdebug", "TLB %s exception. Details:\n"
            "Failed Virtual Address: 0x%8.8x\n"
            "Virtual Page Number:    0x%8.8x\n"
            "ASID (Thread number):   %d\n",
-           tes->badvaddr, tes->badvpn2, tes->asid);
+           name, tes->badvaddr, tes->badvpn2, tes->asid);
+}
+
+// this writes the pagetable entry into the tlb. 
+// it assumes that atleast one of the pages resides in physical memory
+// if _tlb_probe finds a corresponding entry, it gets updated
+// if not, it does write_random
+// returns 1 if a previous entry was updated, 0 if new one was created
+int upsert_into_tlb(pagetable_entry_t *entry, uint32_t ASID) {
+    tlb_entry_t tlb_entry;
+    memoryset(&tlb_entry, 0, sizeof(tlb_entry_t));
+    tlb_entry.ASID = ASID;
+    tlb_entry.VPN2 = entry->VPN;
+    
+    int tlb_loc = _tlb_probe(&tlb_entry);
+
+    // construct the new tlb entry by checking if the virtual pages lie in memory
+    if (entry->even_page >= 0 && virtual_pool[entry->even_page].phys_page >= 0) {
+        tlb_entry.V0 = 1;
+        phys_page_t *phys_page = &phys_pool[virtual_pool[entry->even_page].phys_page];
+        tlb_entry.PFN0 = phys_page->phys_address >> 12;
+        tlb_entry.D0 = phys_page->dirty;
+    }
+    if (entry->odd_page >= 0 && virtual_pool[entry->odd_page].phys_page >= 0) {
+        tlb_entry.V1 = 1;
+        phys_page_t *phys_page = &phys_pool[virtual_pool[entry->odd_page].phys_page];
+        tlb_entry.PFN1 = phys_page->phys_address >> 12;
+        tlb_entry.D1 = phys_page->dirty;
+    }
+
+    if (tlb_loc < 0) {
+        _tlb_write_random(&tlb_entry);
+        return 0;
+    } else {
+        KERNEL_ASSERT(_tlb_write(&tlb_entry, tlb_loc, 1) == 1);
+        return 1;
+    }
 }
 
 // returns 1 if handled properly
@@ -78,7 +117,7 @@ int tlb_modified_exception(void)
     _tlb_get_exception_state(&tes);
 
     DEBUG("tlbdebug", "current thread %d\n", thread_get_current_thread());
-    print_tlb_debug(&tes);
+    print_tlb_debug(&tes, "modified");
 
     thread_table_t *my_entry = thread_get_current_thread_entry();
     if (!my_entry->pagetable)
@@ -91,17 +130,59 @@ int tlb_modified_exception(void)
     // mark it as dirty in the phys page table
     for (i = 0; i < pagetable->valid_count; i++) {
         pagetable_entry_t *entry = &pagetable->entries[i]; 
-        DEBUG("tlbdebug", "entry vpn 0x%x\n", entry->VPN);
-        int virtual_page = -1;
-        if (entry->even_page >= 0 && ADDR_IS_ON_EVEN_PAGE(tes.badvaddr)) {
-            virtual_page = entry->even_page; 
-        } else if (entry->odd_page >= 0 && ADDR_IS_ON_ODD_PAGE(tes.badvaddr)) {
-            virtual_page = entry->odd_page; 
+        DEBUG("tlbdebug", "entry vpn 0x%x, even %d, odd %d\n", entry->VPN, entry->even_page, entry->odd_page);
+        if (entry->VPN == tes.badvpn2) {
+            int virtual_page = -1;
+            if (entry->even_page >= 0 && ADDR_IS_ON_EVEN_PAGE(tes.badvaddr)) {
+                virtual_page = entry->even_page; 
+            } else if (entry->odd_page >= 0 && ADDR_IS_ON_ODD_PAGE(tes.badvaddr)) {
+                virtual_page = entry->odd_page; 
+            }
+            if (virtual_page != -1) {
+                // mark the corresponding phys page as dirty
+                vm_virtual_page_modified(virtual_page);
+                // write the page as dirty to TLB
+                KERNEL_ASSERT(upsert_into_tlb(entry, pagetable->ASID) == 1);
+                return 1;
+            }
         }
-        if (virtual_page != -1) {
-            // mark the corresponding phys page as dirty
-            vm_virtual_page_modified(virtual_page);
-            return 1;
+    }
+
+    return -1;
+}
+
+// handles both kinds of tlb misses
+// if is_store is set, then the dirty flag will be set to 1 in the phys page
+int tlb_miss(int is_store)
+{
+    tlb_exception_state_t tes;
+    _tlb_get_exception_state(&tes);
+
+    print_tlb_debug(&tes, "miss");
+
+    thread_table_t *my_entry = thread_get_current_thread_entry();
+    if (!my_entry->pagetable)
+        return -1;
+
+    pagetable_t *pagetable = my_entry->pagetable;
+
+    DEBUG("tlbdebug", "pagetable has %d entries\n", pagetable->valid_count);
+
+    uint32_t i;
+    for (i = 0; i < pagetable->valid_count; i++) {
+        pagetable_entry_t *entry = &pagetable->entries[i]; 
+        DEBUG("tlbdebug", "entry vpn 0x%x, even %d, odd %d\n", entry->VPN, entry->even_page, entry->odd_page);
+        if (entry->VPN == tes.badvpn2) {
+            if (entry->even_page >= 0 && ADDR_IS_ON_EVEN_PAGE(tes.badvaddr)) {
+                vm_ensure_page_in_memory(entry->even_page, is_store); 
+                upsert_into_tlb(entry, pagetable->ASID);
+                return 1;
+            } else if (entry->odd_page >= 0 && ADDR_IS_ON_ODD_PAGE(tes.badvaddr)) {
+                vm_ensure_page_in_memory(entry->odd_page, is_store); 
+                upsert_into_tlb(entry, pagetable->ASID);
+                return 1;
+            }
+            break;
         }
     }
 
@@ -111,71 +192,13 @@ int tlb_modified_exception(void)
 // returns 1 if handled properly
 int tlb_load_exception(void)
 {    
-    tlb_exception_state_t tes;
-    _tlb_get_exception_state(&tes);
-
-    print_tlb_debug(&tes);
-
-    thread_table_t *my_entry = thread_get_current_thread_entry();
-    if (!my_entry->pagetable)
-        return -1;
-
-    pagetable_t *pagetable = my_entry->pagetable;
-
-    DEBUG("tlbdebug", "pagetable has %d entries\n", pagetable->valid_count);
-
-    uint32_t i;
-    for (i = 0; i < pagetable->valid_count; i++) {
-        tlb_entry_t *entry = &pagetable->entries[i]; 
-        DEBUG("tlbdebug", "entry vpn2 0x%x\n", entry->VPN2);
-        if (entry->VPN2 == tes.badvpn2) {
-            if (entry->V0 && ADDR_IS_ON_EVEN_PAGE(tes.badvaddr)) {
-                _tlb_write_random(entry);
-                return 1;
-            } else if (entry->V1 && ADDR_IS_ON_ODD_PAGE(tes.badvaddr)) {
-                _tlb_write_random(entry);
-                return 1;
-            }
-            break;
-        }
-    }
-
-    return -1;
+    return tlb_miss(0);
 }
 
 // returns 1 if handled properly
 int tlb_store_exception(void)
 {
-    tlb_exception_state_t tes;
-    _tlb_get_exception_state(&tes);
-
-    print_tlb_debug(&tes);
-
-    thread_table_t *my_entry = thread_get_current_thread_entry();
-    if (!my_entry->pagetable)
-        return -1;
-
-    pagetable_t *pagetable = my_entry->pagetable;
-
-    DEBUG("tlbdebug", "pagetable has %d entries\n", pagetable->valid_count);
-
-    uint32_t i;
-    for (i = 0; i < pagetable->valid_count; i++) {
-        tlb_entry_t *entry = &pagetable->entries[i]; 
-        DEBUG("tlbdebug", "entry vpn2 0x%x\n", entry->VPN2);
-        if (entry->VPN2 == tes.badvpn2) {
-            if (entry->V0 && ADDR_IS_ON_EVEN_PAGE(tes.badvaddr)) {
-                _tlb_write_random(entry);
-                return 1;
-            } else if (entry->V1 && ADDR_IS_ON_ODD_PAGE(tes.badvaddr)) {
-                _tlb_write_random(entry);
-                return 1;
-            }
-            break;
-        }
-    }
-
-    return -1;
+    return tlb_miss(1);
 }
 #else
 void tlb_modified_exception(void)
@@ -196,8 +219,6 @@ void tlb_store_exception(void)
 
 
 #ifdef CHANGED_4
-// Fill the TLB with the first pages from the pagetable
-// As many as pages that fit into TLB are used
 #else
 /**
  * Fill TLB with given pagetable. This function is used to set memory
@@ -207,57 +228,21 @@ void tlb_store_exception(void)
  * @param pagetable Mappings to write to TLB.
  *
  */
-#endif
-
 void tlb_fill(pagetable_t *pagetable)
 {
     if(pagetable == NULL)
 	return;
 
-    #ifdef CHANGED_4
-    // disable interrups to be sure that we can in one go fill and clean the TLB
-    interrupt_status_t intr_status;
-    intr_status = _interrupt_disable();
-    #else
     /* Check that the pagetable can fit into TLB. This is needed until
      we have proper VM system, because the whole pagetable must fit
      into TLB. */
     KERNEL_ASSERT(pagetable->valid_count <= (_tlb_get_maxindex()+1));
-    #endif
 
-    #ifdef CHANGED_4
-    uint32_t i;
-    DEBUG("tlbdebug", "IN TLB FILL, ASID %d\n", pagetable->ASID);
-    for (i = 0; i < pagetable->valid_count; i++) {
-        tlb_entry_t *entry = &pagetable->entries[i]; 
-        DEBUG("tlbdebug", "entry vpn2 0x%x\n", entry->VPN2);
-        if (entry->V0)
-            DEBUG("tlbdebug", "   - PFN0 0x%x, , D0 %d\n", entry->PFN0, entry->D0);
-        if (entry->V1)
-            DEBUG("tlbdebug", "   - PFN1 0x%x, , D1 %d\n", entry->PFN1, entry->D1);
-    }
-    _tlb_write(pagetable->entries, 0, MIN(pagetable->valid_count, _tlb_get_maxindex()+1));
-    #else
     _tlb_write(pagetable->entries, 0, pagetable->valid_count);
-    #endif
-
-    #ifdef CHANGED_4
-    // tlb_fill gets called in places, where something funky might be happening with the tlb:
-    // - ownership of a pagetable might be moving between threads etc
-    // so clean the rest of the TLB to avoid invalid entries
-    tlb_entry_t zero_entry;
-    memoryset(&zero_entry, 0, sizeof(tlb_entry_t));
-    for (i = pagetable->valid_count; i <= _tlb_get_maxindex(); i++) {
-        _tlb_write(&zero_entry, i, 1);
-    }
-    #endif
 
     /* Set ASID field in Co-Processor 0 to match thread ID so that
        only entries with the ASID of the current thread will match in
        the TLB hardware. */
     _tlb_set_asid(pagetable->ASID);
-
-    #ifdef CHANGED_4
-    _interrupt_set_state(intr_status);
-    #endif
 }
+#endif

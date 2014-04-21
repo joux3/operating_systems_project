@@ -44,6 +44,7 @@
 #include "drivers/gbd.h"
 #include "lib/debug.h"
 #include "kernel/interrupt.h"
+#include "drivers/metadev.h"
 #endif
 
 /** @name Virtual memory system
@@ -108,6 +109,7 @@ void vm_init(void)
         KERNEL_PANIC("Not enough memory left for virtual page pool data!");
     // statically reserve phys pool entries from the free memory left
     phys_pool_size = (kmalloc_get_numpages() - kmalloc_get_reserved_pages())/2; 
+    KERNEL_ASSERT(phys_pool_size > 0);
     phys_pool = (phys_page_t*)kmalloc(phys_pool_size * sizeof(phys_page_t)); 
     if (!phys_pool)
         KERNEL_PANIC("Not enough memory left for physical page pool data!");
@@ -143,6 +145,15 @@ int swap_write_block(uint32_t block, uint32_t addr) {
     return swap_gbd->write_block(swap_gbd, &req);
 }
 
+int swap_read_block(uint32_t block, uint32_t addr) {
+    gbd_request_t req;
+
+    req.block = block;
+    req.sem = NULL;
+    req.buf = ADDR_KERNEL_TO_PHYS(addr);
+    return swap_gbd->read_block(swap_gbd, &req);
+}
+
 // finds a free virtual page and returns its id
 // returns negative if no virtual pages left
 int vm_get_virtual_page() 
@@ -168,6 +179,7 @@ int vm_get_virtual_page()
             swap_write_block(i, buffer);
             pagepool_free_phys_page(buffer);
 
+            DEBUG("swapdebug", "Reserved virtual page %d\n", i);
             return i;
         }
     }
@@ -200,6 +212,11 @@ void vm_free_virtual_page(int virtual_page)
 // sets the corresponding phys page of this virtual page as dirty
 void vm_virtual_page_modified(int virtual_page)
 {
+    /* Interrupts _must_ be disabled when calling this function: */
+    interrupt_status_t intr_state = _interrupt_get_state();
+    KERNEL_ASSERT((intr_state & INTERRUPT_MASK_ALL) == 0 
+                  || !(intr_state & INTERRUPT_MASK_MASTER));
+
     KERNEL_ASSERT(virtual_page >= 0 && virtual_page < (int)virtual_pool_size);
     
     virtual_page_t *page = &virtual_pool[virtual_page];
@@ -209,6 +226,60 @@ void vm_virtual_page_modified(int virtual_page)
     KERNEL_ASSERT(phys_page->dirty == 0);
 
     phys_page->dirty = 1;
+    phys_page->ticks = rtc_get_msec();
+}
+
+// makes sure that the given virtual page is in memory
+// also sets the dirty flag if wanted
+void vm_ensure_page_in_memory(int virtual_page, int dirty)
+{
+    /* Interrupts _must_ be disabled when calling this function: */
+    interrupt_status_t intr_state = _interrupt_get_state();
+    KERNEL_ASSERT((intr_state & INTERRUPT_MASK_ALL) == 0 
+                  || !(intr_state & INTERRUPT_MASK_MASTER));
+
+    KERNEL_ASSERT(virtual_page >= 0 && virtual_page < (int)virtual_pool_size);
+    
+    virtual_page_t *page = &virtual_pool[virtual_page];
+    KERNEL_ASSERT(page->in_use);
+    phys_page_t *phys_page = NULL;
+    DEBUG("swapdebug", "SWAP: ensuring virtual page %d is in memory\n", virtual_page);
+    if (page->phys_page >= 0) {
+        // page is already in memory, OK
+        phys_page = &phys_pool[page->phys_page];
+    } else {
+        // find a free phys page
+        uint32_t i;
+        for (i = 0; i < phys_pool_size; i++) {
+            if (phys_pool[i].state == PAGE_FREE) {
+                DEBUG("swapdebug", "   - found free phys page %d\n", i);
+                page->phys_page = i;
+                phys_page = &phys_pool[i];
+                break;
+            }
+        }
+        if (!phys_page) {
+            // need to swap some page out
+            KERNEL_PANIC("Swap not implemented!");
+        }
+
+        phys_page->virtual_page = virtual_page;
+        phys_page->state = PAGE_UNDER_IO;
+
+        // enable interrupts for disk read
+        intr_state = _interrupt_enable();  
+
+        KERNEL_ASSERT(swap_read_block(virtual_page, phys_page->phys_address) != 0);
+
+        _interrupt_set_state(intr_state);
+        phys_page->state = PAGE_IN_USE;
+    }
+
+    KERNEL_ASSERT(phys_page->state == PAGE_IN_USE);
+    KERNEL_ASSERT((int)phys_page->virtual_page == virtual_page);
+
+    phys_page->ticks = rtc_get_msec();
+    phys_page->dirty = dirty;
 }
 
 #endif
@@ -325,8 +396,10 @@ void vm_map(pagetable_t *pagetable,
 
     if(ADDR_IS_ON_EVEN_PAGE(vaddr)) {
         pagetable->entries[pagetable->valid_count].even_page = virtual_page;
+        pagetable->entries[pagetable->valid_count].odd_page = -1;
     } else {
         pagetable->entries[pagetable->valid_count].odd_page = virtual_page;
+        pagetable->entries[pagetable->valid_count].even_page = -1;
     }
 
     pagetable->valid_count++;
