@@ -44,6 +44,7 @@
 #include "drivers/gbd.h"
 #include "lib/debug.h"
 #include "kernel/interrupt.h"
+#include "kernel/lock_cond.h"
 #include "drivers/metadev.h"
 #endif
 
@@ -68,6 +69,7 @@ uint32_t virtual_pool_size;
 virtual_page_t *virtual_pool;
 uint32_t phys_pool_size;
 phys_page_t *phys_pool;
+lock_t *phys_pool_lock;
 #endif
 
 
@@ -86,6 +88,8 @@ void vm_init(void)
     KERNEL_ASSERT(sizeof(tlb_entry_t) == 12);
 
     #ifdef CHANGED_4
+    phys_pool_lock = lock_create();    
+
     // find out the swap gbd by looking for disk with block size PAGE_SIZE
     int i = 0;
     while (1) {
@@ -158,20 +162,22 @@ int swap_read_block(uint32_t block, uint32_t addr) {
 // this should be called with interrupts disabled
 void swap_page(phys_page_t *phys_page) {
     KERNEL_ASSERT(phys_page->state == PAGE_IN_USE);
+
+    // at this point the old mapping for the physical page might be in TLB, so clean it.
+    // if we get a TLB miss to this page, vm_ensure_page_in_memory will block on 
+    // phys_pool_lock so the same physical page won't be used
+    tlb_clean();
      
     phys_page->state = PAGE_UNDER_IO;
-    if (phys_page->dirty) {
+    //if (phys_page->dirty) {
+        DEBUG("swapdebug", "Writing virtual page %d to disk\n", phys_page->virtual_page);
         // NOTE: there's a potential concurrency problem here, TODO
         // the process can still write the memory at phys_address
         KERNEL_ASSERT(swap_write_block(phys_page->virtual_page, phys_page->phys_address) != 0);
-    }
+    //}
 
     // stop the phys page from being used
     virtual_pool[phys_page->virtual_page].phys_page = -1;
-
-    // at this point the old mapping for the physical page might be in TLB, so clean it
-    // TODO: only remove the needed entry, not clean the whole table
-    tlb_clean();
 
     phys_page->state = PAGE_FREE;
 }
@@ -180,7 +186,7 @@ void swap_page(phys_page_t *phys_page) {
 // returns negative if no virtual pages left
 int vm_get_virtual_page() 
 {
-    // disable to interrupts instead of locking
+    // disable to interrupts instead of locking to access virtual pool
     interrupt_status_t intr_status;
     intr_status = _interrupt_disable();
 
@@ -215,7 +221,7 @@ void vm_free_virtual_page(int virtual_page)
 {
     KERNEL_ASSERT(virtual_page >= 0 && virtual_page < (int)virtual_pool_size);
 
-    // disable to interrupts instead of locking
+    // disable to interrupts instead of locking to access virtual_pool
     interrupt_status_t intr_status;
     intr_status = _interrupt_disable();
 
@@ -259,6 +265,8 @@ void vm_ensure_page_in_memory(int virtual_page, int dirty)
     interrupt_status_t intr_state = _interrupt_get_state();
     KERNEL_ASSERT((intr_state & INTERRUPT_MASK_ALL) == 0 
                   || !(intr_state & INTERRUPT_MASK_MASTER));
+    
+    lock_acquire(phys_pool_lock);
 
     KERNEL_ASSERT(virtual_page >= 0 && virtual_page < (int)virtual_pool_size);
     
@@ -296,7 +304,7 @@ void vm_ensure_page_in_memory(int virtual_page, int dirty)
             page->phys_page = oldest_i;
         }
 
-        DEBUG("swapdebug", "   - swapping in page %d\n", virtual_page);
+        DEBUG("swapdebug", "   - swapping in virtual page %d -> phys page %d\n", virtual_page, page->phys_page);
         phys_page->virtual_page = virtual_page;
         phys_page->state = PAGE_UNDER_IO;
 
@@ -310,6 +318,8 @@ void vm_ensure_page_in_memory(int virtual_page, int dirty)
 
     phys_page->ticks = rtc_get_msec();
     phys_page->dirty = dirty;
+
+    lock_release(phys_pool_lock);
 }
 
 #endif

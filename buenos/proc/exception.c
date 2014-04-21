@@ -93,6 +93,7 @@ void user_exception_handle(int exception)
             if (!handled) {
             #endif
                 kprintf("Exception %d occured in userland process %d\n", exception, thread_get_current_process());
+                kprintf("- PC: 0x%x\n", my_entry->user_context->pc);
                 _interrupt_enable();
                 syscall_exit_process(127); 
                 KERNEL_PANIC("Should not return from syscall_exit\n");
