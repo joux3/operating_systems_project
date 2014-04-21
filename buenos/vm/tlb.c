@@ -153,12 +153,12 @@ int tlb_modified_exception(void)
 
 // handles both kinds of tlb misses
 // if is_store is set, then the dirty flag will be set to 1 in the phys page
-int tlb_miss(int is_store)
+int tlb_miss(int is_store, char* debug_name)
 {
     tlb_exception_state_t tes;
     _tlb_get_exception_state(&tes);
 
-    print_tlb_debug(&tes, "miss");
+    print_tlb_debug(&tes, debug_name);
 
     thread_table_t *my_entry = thread_get_current_thread_entry();
     if (!my_entry->pagetable)
@@ -192,13 +192,13 @@ int tlb_miss(int is_store)
 // returns 1 if handled properly
 int tlb_load_exception(void)
 {    
-    return tlb_miss(0);
+    return tlb_miss(0, "load miss");
 }
 
 // returns 1 if handled properly
 int tlb_store_exception(void)
 {
-    return tlb_miss(1);
+    return tlb_miss(1, "store miss");
 }
 #else
 void tlb_modified_exception(void)

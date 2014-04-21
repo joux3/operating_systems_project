@@ -167,17 +167,15 @@ void swap_page(phys_page_t *phys_page) {
     // if we get a TLB miss to this page, vm_ensure_page_in_memory will block on 
     // phys_pool_lock so the same physical page won't be used
     tlb_clean();
-     
-    phys_page->state = PAGE_UNDER_IO;
-    //if (phys_page->dirty) {
-        DEBUG("swapdebug", "Writing virtual page %d to disk\n", phys_page->virtual_page);
-        // NOTE: there's a potential concurrency problem here, TODO
-        // the process can still write the memory at phys_address
-        KERNEL_ASSERT(swap_write_block(phys_page->virtual_page, phys_page->phys_address) != 0);
-    //}
 
     // stop the phys page from being used
     virtual_pool[phys_page->virtual_page].phys_page = -1;
+     
+    phys_page->state = PAGE_UNDER_IO;
+    if (phys_page->dirty) {
+        DEBUG("swapdebug", "Writing virtual page %d to disk\n", phys_page->virtual_page);
+        KERNEL_ASSERT(swap_write_block(phys_page->virtual_page, phys_page->phys_address) != 0);
+    }
 
     phys_page->state = PAGE_FREE;
 }
@@ -221,13 +219,15 @@ void vm_free_virtual_page(int virtual_page)
 {
     KERNEL_ASSERT(virtual_page >= 0 && virtual_page < (int)virtual_pool_size);
 
-    // disable to interrupts instead of locking to access virtual_pool
+    // disable interrupts instead of locking to access virtual_pool
     interrupt_status_t intr_status;
     intr_status = _interrupt_disable();
 
     KERNEL_ASSERT(virtual_pool[virtual_page].in_use);
 
     if (virtual_pool[virtual_page].phys_page >= 0) {
+        // don't need the phys_pool lock here, as only swap_page might modify
+        // the phys_page, but it does it before switching threads in disk io
         int phys_page = virtual_pool[virtual_page].phys_page;
         KERNEL_ASSERT(phys_pool[phys_page].virtual_page == (uint32_t)virtual_page);
         phys_pool[phys_page].state = PAGE_FREE;
@@ -317,7 +317,9 @@ void vm_ensure_page_in_memory(int virtual_page, int dirty)
     KERNEL_ASSERT((int)phys_page->virtual_page == virtual_page);
 
     phys_page->ticks = rtc_get_msec();
-    phys_page->dirty = dirty;
+    // don't remove the possible dirty flag even if we came from a load miss
+    if (dirty)
+        phys_page->dirty = dirty;
 
     lock_release(phys_pool_lock);
 }
