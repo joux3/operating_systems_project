@@ -337,7 +337,7 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
         int virtual_page = vm_get_virtual_page();
         KERNEL_ASSERT(virtual_page != -1);
         vm_map(new_entry->pagetable, virtual_page, 
-               (USERLAND_STACK_TOP & PAGE_SIZE_MASK) - i*PAGE_SIZE);
+               (USERLAND_STACK_TOP & PAGE_SIZE_MASK) - i*PAGE_SIZE, 0);
         #else
         #error
         #endif
@@ -352,7 +352,7 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
         KERNEL_ASSERT(virtual_page != -1);
         DEBUG("processdebug", "mapping %x -> %x\n", elf.ro_vaddr + i*PAGE_SIZE, virtual_page);
         vm_map(new_entry->pagetable, virtual_page, 
-               elf.ro_vaddr + i*PAGE_SIZE);
+               elf.ro_vaddr + i*PAGE_SIZE, 0);
         #else
         #error
         #endif
@@ -385,7 +385,7 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
             KERNEL_ASSERT(virtual_page != 0);
             DEBUG("processdebug", "mapping %x -> %x\n", elf.rw_vaddr + i*PAGE_SIZE, virtual_page);
             vm_map(new_entry->pagetable, virtual_page, 
-                   elf.rw_vaddr + i*PAGE_SIZE);
+                   elf.rw_vaddr + i*PAGE_SIZE, 0);
             #else
             #error
             #endif

@@ -46,10 +46,16 @@
 typedef struct pagetable_entry_struct_t {
     // the virtual page pair number, length 19 bits
     uint32_t VPN;  
+
     // virtual page number for the even VPN + 0 page. negative if empty
-    int even_page;
+    int16_t even_page;
+    // is write-protected for even page
+    uint8_t even_write_protect;
+
     // virtual page number for the even VPN + 1 page. negative if empty
-    int odd_page;
+    int16_t odd_page;
+    // is write-protected for odd page
+    uint8_t odd_write_protect;
 } pagetable_entry_t;
 
 #define PAGETABLE_ENTRIES 340

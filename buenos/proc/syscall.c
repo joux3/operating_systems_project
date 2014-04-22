@@ -406,7 +406,7 @@ void *memlimit(void *heap_end)
             if (new_page < 0)
                 return NULL; // TODO: free the pages we successfully got before. that can be done by using the lowering memlimit code
             pagetable->memlimit += PAGE_SIZE;
-            vm_map(pagetable, new_page, pagetable->memlimit & PAGE_SIZE_MASK);
+            vm_map(pagetable, new_page, pagetable->memlimit & PAGE_SIZE_MASK, 0);
             DEBUG("memlimit", " - mapped 0x%x -> virtual page %d\n", pagetable->memlimit & PAGE_SIZE_MASK, new_page);
         }
         // put it where the userland wanted it even if we actually allocate full pages

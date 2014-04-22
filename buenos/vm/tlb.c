@@ -134,8 +134,12 @@ int tlb_modified_exception(void)
         if (entry->VPN == tes.badvpn2) {
             int virtual_page = -1;
             if (entry->even_page >= 0 && ADDR_IS_ON_EVEN_PAGE(tes.badvaddr)) {
+                if (entry->even_write_protect)
+                    return -1;
                 virtual_page = entry->even_page; 
             } else if (entry->odd_page >= 0 && ADDR_IS_ON_ODD_PAGE(tes.badvaddr)) {
+                if (entry->odd_write_protect)
+                    return -1;
                 virtual_page = entry->odd_page; 
             }
             if (virtual_page != -1) {
@@ -174,10 +178,14 @@ int tlb_miss(int is_store, char* debug_name)
         DEBUG("tlbdebug", "entry vpn 0x%x, even %d, odd %d\n", entry->VPN, entry->even_page, entry->odd_page);
         if (entry->VPN == tes.badvpn2) {
             if (entry->even_page >= 0 && ADDR_IS_ON_EVEN_PAGE(tes.badvaddr)) {
+                if (is_store && entry->even_write_protect)
+                    return -1;
                 vm_ensure_page_in_memory(entry->even_page, is_store); 
                 upsert_into_tlb(entry, pagetable->ASID);
                 return 1;
             } else if (entry->odd_page >= 0 && ADDR_IS_ON_ODD_PAGE(tes.badvaddr)) {
+                if (is_store && entry->odd_write_protect)
+                    return -1;
                 vm_ensure_page_in_memory(entry->odd_page, is_store); 
                 upsert_into_tlb(entry, pagetable->ASID);
                 return 1;

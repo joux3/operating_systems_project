@@ -88,6 +88,11 @@ void vm_init(void)
     KERNEL_ASSERT(sizeof(tlb_entry_t) == 12);
 
     #ifdef CHANGED_4
+    // make sure our pagetable structure fits into page
+    KERNEL_ASSERT(sizeof(pagetable_t) <= PAGE_SIZE);
+    // also make sure that it's as full as possible
+    KERNEL_ASSERT(PAGE_SIZE - sizeof(pagetable_t) < sizeof(pagetable_entry_t));
+
     phys_pool_lock = lock_create();    
 
     // find out the swap gbd by looking for disk with block size PAGE_SIZE
@@ -98,7 +103,9 @@ void vm_init(void)
             KERNEL_PANIC("No swap disk found!");
         swap_gbd = disk->generic_device;
         if (swap_gbd->block_size(swap_gbd) == PAGE_SIZE) {
-            virtual_pool_size = swap_gbd->total_blocks(swap_gbd);
+            // use max 10k virtual pages as our logic is mainly O(n)
+            // also the virtual page identifiers finally have to fit in a short
+            virtual_pool_size = MIN(swap_gbd->total_blocks(swap_gbd), 10000);
             kprintf("Pagepool: using the disk at 0x%x for swap, %d virtual pages\n", 
                     disk->io_address, virtual_pool_size);
             break;
@@ -133,8 +140,6 @@ void vm_init(void)
             KERNEL_PANIC("Not enough memory left for physical pages!");
     }
     DEBUG("swapdebug", "SWAP: Allocated a total of %d physical pages for paging\n", phys_pool_size);
-
-    KERNEL_ASSERT(sizeof(pagetable_t) <= PAGE_SIZE);
     #endif
 }
 
@@ -390,9 +395,12 @@ void vm_destroy_pagetable(pagetable_t *pagetable)
 
 void vm_map(pagetable_t *pagetable, 
             int virtual_page, 
-            uint32_t vaddr)
+            uint32_t vaddr,
+            int write_protected)
 {
     unsigned int i;
+
+    KERNEL_ASSERT(write_protected == 0 || write_protected == 1);
 
     if (virtual_page < 0 || virtual_page >= (int)virtual_pool_size)
         KERNEL_PANIC("Tried to map an unexistant virtual page!");
@@ -408,6 +416,7 @@ void vm_map(pagetable_t *pagetable,
                 } else {
                     /* Map the page on a pair entry */
                     pagetable->entries[i].even_page = virtual_page;
+                    pagetable->entries[i].even_write_protect = write_protected;
                     return;
                 }
             } else {
@@ -416,6 +425,7 @@ void vm_map(pagetable_t *pagetable,
                 } else {
                     /* Map the page on a pair entry */
                     pagetable->entries[i].odd_page = virtual_page;
+                    pagetable->entries[i].odd_write_protect = write_protected;
                     return;
                 }
             }
@@ -438,9 +448,11 @@ void vm_map(pagetable_t *pagetable,
 
     if(ADDR_IS_ON_EVEN_PAGE(vaddr)) {
         pagetable->entries[pagetable->valid_count].even_page = virtual_page;
+        pagetable->entries[pagetable->valid_count].even_write_protect = write_protected;
         pagetable->entries[pagetable->valid_count].odd_page = -1;
     } else {
         pagetable->entries[pagetable->valid_count].odd_page = virtual_page;
+        pagetable->entries[pagetable->valid_count].odd_write_protect = write_protected;
         pagetable->entries[pagetable->valid_count].even_page = -1;
     }
 
