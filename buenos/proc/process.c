@@ -449,13 +449,29 @@ int process_start_args(const char *executable, void *arg_data, int arg_datalen, 
     }
 
 
+    #ifdef CHANGED_4
+    /* Set the write protected bit to one (read-only) on read-only pages. */
+    #else 
     /* Set the dirty bit to zero (read-only) on read-only pages. */
+    #endif
     for(i = 0; i < (int)elf.ro_pages; i++) {
+        #ifdef CHANGED_4
+        vm_set_write_protected(new_entry->pagetable, elf.ro_vaddr + i*PAGE_SIZE, 1);
+        #else
         vm_set_dirty(new_entry->pagetable, elf.ro_vaddr + i*PAGE_SIZE, 0);
+        #endif
     }
+    #ifdef CHANGED_4
+    // also write the write protected bits for read-write pages as those might overlap ro pages
+    #else
     // also write dirty bits for read-write pages as those might overlap ro pages
+    #endif
     for(i = 0; i < (int)elf.rw_pages; i++) {
+        #ifdef CHANGED_4 
+        vm_set_write_protected(new_entry->pagetable, elf.rw_vaddr + i*PAGE_SIZE, 0);
+        #else
         vm_set_dirty(new_entry->pagetable, elf.rw_vaddr + i*PAGE_SIZE, 1);
+        #endif
     }
 
     // manually overwrite the arg to point to entry point

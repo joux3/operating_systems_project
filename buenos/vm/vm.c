@@ -465,7 +465,8 @@ void vm_map(pagetable_t *pagetable,
 
 /**
  * Unmaps given virtual address from given pagetable. Also frees 
- * the corresponding virtual page.
+ * the corresponding virtual page. Note: if the address hasn't been mapped, nothing
+ * is done.
  *
  * @param pagetable Page table to operate on
  *
@@ -481,16 +482,12 @@ void vm_unmap(pagetable_t *pagetable, uint32_t vaddr)
         if(pagetable->entries[i].VPN == (vaddr >> 13)) {
             // free the virtual page and remove the mapping 
             if(ADDR_IS_ON_EVEN_PAGE(vaddr)) {
-                if (pagetable->entries[i].even_page < 0) {
-                    KERNEL_PANIC("Trying to unmap a page that hasn't been mapped!");
-                } else {
+                if (pagetable->entries[i].even_page >= 0) {
                     vm_free_virtual_page(pagetable->entries[i].even_page);
                     pagetable->entries[i].even_page = -1;
                 }
             } else {
-                if (pagetable->entries[i].odd_page < 0) {
-                    KERNEL_PANIC("Trying to unmap a page that hasn't been mapped!");
-                } else {
+                if (pagetable->entries[i].odd_page >= 0) {
                     vm_free_virtual_page(pagetable->entries[i].odd_page);
                     pagetable->entries[i].odd_page = -1;
                 }
@@ -509,6 +506,52 @@ void vm_unmap(pagetable_t *pagetable, uint32_t vaddr)
     #endif
 }
 
+#ifdef CHANGED_4
+/**
+ * Sets the write protected bit for the given virtual page in the given
+ * pagetable. The page must already be mapped in the pagetable.
+ * If a page is not marked write protected it can be read and written. 
+ * If it is marked write protected, it can be only read.
+ *
+ * @param pagetable The pagetable where the mapping resides.
+ *
+ * @param vaddr The virtual address whose write protected bit is to be set.
+ *
+ * @param dirty What the write protected bit is set to. Must be 0 or 1.
+ */
+void vm_set_write_protected(pagetable_t *pagetable, uint32_t vaddr, int write_protected)
+{
+    uint32_t i;
+
+    KERNEL_ASSERT(write_protected == 0 || write_protected == 1);
+
+    for(i=0; i < pagetable->valid_count; i++) {
+        if(pagetable->entries[i].VPN == (vaddr >> 13)) {
+            /* Check whether this is an even or odd page */
+            if(ADDR_IS_ON_EVEN_PAGE(vaddr)) {
+                if(pagetable->entries[i].even_page < 0) {
+                    KERNEL_PANIC("Tried to set write protected bit of an unmapped "
+                                 "entry");
+                } else {
+                    pagetable->entries[i].even_write_protect = write_protected;
+                    return;
+                }
+            } else {
+                if(pagetable->entries[i].odd_page < 0) {
+                    KERNEL_PANIC("Tried to set write protected bit of an unmapped "
+                                 "entry");
+                } else {
+                    pagetable->entries[i].odd_write_protect = write_protected;
+                    return;
+                }
+            }
+        }
+    }
+    /* No mapping was found */
+
+    KERNEL_PANIC("Tried to set dirty bit of an unmapped entry");
+}
+#else
 /**
  * Sets the dirty bit for the given virtual page in the given
  * pagetable. The page must already be mapped in the pagetable.
@@ -523,12 +566,6 @@ void vm_unmap(pagetable_t *pagetable, uint32_t vaddr)
  */
 void vm_set_dirty(pagetable_t *pagetable, uint32_t vaddr, int dirty)
 {
-    #ifdef CHANGED_4
-    // NOP for now as we don't support write protected virtual pages
-    pagetable = pagetable;
-    vaddr = vaddr;
-    dirty = dirty;
-    #else
     unsigned int i;
 
     KERNEL_ASSERT(dirty == 0 || dirty == 1);
@@ -558,7 +595,7 @@ void vm_set_dirty(pagetable_t *pagetable, uint32_t vaddr, int dirty)
     /* No mapping was found */
 
     KERNEL_PANIC("Tried to set dirty bit of an unmapped entry");
-    #endif
 }
+#endif
 
 /** @} */

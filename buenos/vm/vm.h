@@ -101,6 +101,13 @@ void vm_map(pagetable_t *pagetable, uint32_t physaddr,
 	    uint32_t vaddr, int dirty);
 #endif
 void vm_unmap(pagetable_t *pagetable, uint32_t vaddr);
+#ifdef CHANGED_4 
+void vm_set_write_protected(pagetable_t *pagetable, uint32_t vaddr, int write_protected);
+// set dirty is misleading now, as the word dirty is reserved
+// for virtual pages whose memory version differs from their disk version
+// HOX: the old dirty flag is exactly reverse of the new write_protected flag
+#else
 void vm_set_dirty(pagetable_t *pagetable, uint32_t vaddr, int dirty);
+#endif
 
 #endif /* BUENOS_VM_VM_H */
