@@ -74,4 +74,7 @@ int atoi(const char *c);
 int stringcmp(const char *str1, const char *str2);
 #define MIN(arg1,arg2) ((arg1) > (arg2) ? (arg2) : (arg1))
 
+void *malloc(uint32_t size);
+void free(void *ptr);
+
 #endif /* BUENOS_USERLAND_LIB_H */

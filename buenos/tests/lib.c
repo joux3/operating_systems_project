@@ -278,3 +278,87 @@ int stringcmp(const char *str1, const char *str2)
     /* Dummy return to keep gcc happy */
     return 0; 
 }
+
+#define MIN_FRAGMENT 24
+
+uint32_t heap_bottom = 0;
+
+typedef struct {
+    uint32_t size;
+    uint32_t is_deleted;
+} alloc_header_t;
+
+void *malloc(uint32_t size) {
+    uint32_t  new_memlimit;
+	uint32_t heap_end;
+    alloc_header_t *cur_header;
+
+	static uint32_t heap_bottom = 0;
+	if(heap_bottom == 0)
+		heap_bottom = (uint32_t)syscall_memlimit(0);
+
+	heap_end = (uint32_t)syscall_memlimit(0);
+    char buf[10];
+    itoa((int)heap_end, buf);
+    prints(buf);
+    prints("\n");
+	//ceil the size to next word bouyndary
+	size = 3&size ? (~3&size)+4 : size;
+    cur_header = (alloc_header_t*)heap_bottom;
+    //check if free holes big enough in the already allocated area
+    while(heap_end > heap_bottom && cur_header->size + (uint32_t)cur_header + sizeof(alloc_header_t) < heap_end) {
+        //if fits here
+        if(cur_header->is_deleted && (cur_header->size >= size)) {
+            //if there is space to divide the end of the space to a new block 
+            if(cur_header->size > size + sizeof(alloc_header_t) + MIN_FRAGMENT) {
+                alloc_header_t *new_block_header = (alloc_header_t*)((uint32_t)cur_header + size + sizeof(alloc_header_t));
+                new_block_header->is_deleted = 0;
+                new_block_header->size = cur_header->size - size - sizeof(alloc_header_t); 
+               //this only here because otherwise we keep the allocated size same
+                cur_header->size = size;
+            }
+            cur_header->is_deleted = 0;
+            return (void*)((uint32_t)cur_header + sizeof(alloc_header_t));
+        }
+        cur_header += cur_header->size + sizeof(alloc_header_t);
+    }
+    //couldnt find big enough hole so we have to move the program break
+    // query current memlimit
+    cur_header = (alloc_header_t*)heap_end;	
+
+  // caluclate new limit with ceil to word boundary
+    new_memlimit = (uint32_t)cur_header + sizeof(alloc_header_t) + size;
+
+    if(syscall_memlimit((void*)new_memlimit) != (void*)new_memlimit)
+        return 0;
+
+    cur_header->size = size;
+    cur_header->is_deleted = 0;
+   
+    return (void*)((uint32_t)cur_header + sizeof(alloc_header_t));
+}
+
+void free(void *ptr) {
+	uint32_t heap_end;
+    alloc_header_t *cur_header;
+    alloc_header_t *bottom_header;
+
+	//query heap end
+	heap_end = (uint32_t)syscall_memlimit(0);
+    //mark deleted
+    cur_header = (alloc_header_t*)((uint32_t)ptr - sizeof(alloc_header_t));
+    cur_header->is_deleted = 1;
+    bottom_header = cur_header;
+    //start merging deleted areas from this point onwards
+    while(cur_header->is_deleted > 0) {
+		if(bottom_header != cur_header)
+			bottom_header->size += cur_header->size + sizeof(alloc_header_t); 
+        cur_header = (alloc_header_t*)((uint32_t)cur_header + cur_header->size + sizeof(alloc_header_t));
+        if((uint32_t)cur_header >= heap_end - sizeof(alloc_header_t)) {
+            //lower the program break beacause blocks freed from the end of heap
+            syscall_memlimit((void*)bottom_header);
+            break;
+        }
+    }
+    
+}
