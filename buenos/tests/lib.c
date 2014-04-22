@@ -298,10 +298,6 @@ void *malloc(uint32_t size) {
 		heap_bottom = (uint32_t)syscall_memlimit(0);
 
 	heap_end = (uint32_t)syscall_memlimit(0);
-    char buf[10];
-    itoa((int)heap_end, buf);
-    prints(buf);
-    prints("\n");
 	//ceil the size to next word bouyndary
 	size = 3&size ? (~3&size)+4 : size;
     cur_header = (alloc_header_t*)heap_bottom;
