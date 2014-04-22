@@ -34,7 +34,7 @@ int main(void) {
     prints(buf);
     prints("\n");
 
-	memlimit = syscall_memlimit(0);
+    memlimit = syscall_memlimit(0);
     prints("Current memlimit is ");
     itoa((int)memlimit, buf);
     prints(buf);

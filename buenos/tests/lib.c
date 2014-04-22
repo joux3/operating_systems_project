@@ -152,7 +152,7 @@ int syscall_read(int filehandle, void *buffer, int length)
 int syscall_seek(int filehandle, int offset)
 {
     return (int)_syscall(SYSCALL_SEEK,
-			 (uint32_t)filehandle, (uint32_t)offset, 0);
+             (uint32_t)filehandle, (uint32_t)offset, 0);
 }
 
 
@@ -290,16 +290,16 @@ typedef struct {
 
 void *malloc(uint32_t size) {
     uint32_t  new_memlimit;
-	uint32_t heap_end;
+    uint32_t heap_end;
     alloc_header_t *cur_header;
 
-	static uint32_t heap_bottom = 0;
-	if(heap_bottom == 0)
-		heap_bottom = (uint32_t)syscall_memlimit(0);
+    static uint32_t heap_bottom = 0;
+    if(heap_bottom == 0)
+        heap_bottom = (uint32_t)syscall_memlimit(0);
 
-	heap_end = (uint32_t)syscall_memlimit(0);
-	//ceil the size to next word bouyndary
-	size = 3&size ? (~3&size)+4 : size;
+    heap_end = (uint32_t)syscall_memlimit(0);
+    //ceil the size to next word bouyndary
+    size = 3&size ? (~3&size)+4 : size;
     cur_header = (alloc_header_t*)heap_bottom;
     //check if free holes big enough in the already allocated area
     while(heap_end > heap_bottom && cur_header->size + (uint32_t)cur_header + sizeof(alloc_header_t) < heap_end) {
@@ -320,7 +320,7 @@ void *malloc(uint32_t size) {
     }
     //couldnt find big enough hole so we have to move the program break
     // query current memlimit
-    cur_header = (alloc_header_t*)heap_end;	
+    cur_header = (alloc_header_t*)heap_end;    
 
   // caluclate new limit with ceil to word boundary
     new_memlimit = (uint32_t)cur_header + sizeof(alloc_header_t) + size;
@@ -335,20 +335,20 @@ void *malloc(uint32_t size) {
 }
 
 void free(void *ptr) {
-	uint32_t heap_end;
+    uint32_t heap_end;
     alloc_header_t *cur_header;
     alloc_header_t *bottom_header;
 
-	//query heap end
-	heap_end = (uint32_t)syscall_memlimit(0);
+    //query heap end
+    heap_end = (uint32_t)syscall_memlimit(0);
     //mark deleted
     cur_header = (alloc_header_t*)((uint32_t)ptr - sizeof(alloc_header_t));
     cur_header->is_deleted = 1;
     bottom_header = cur_header;
     //start merging deleted areas from this point onwards
     while(cur_header->is_deleted > 0) {
-		if(bottom_header != cur_header)
-			bottom_header->size += cur_header->size + sizeof(alloc_header_t); 
+        if(bottom_header != cur_header)
+            bottom_header->size += cur_header->size + sizeof(alloc_header_t); 
         cur_header = (alloc_header_t*)((uint32_t)cur_header + cur_header->size + sizeof(alloc_header_t));
         if((uint32_t)cur_header >= heap_end - sizeof(alloc_header_t)) {
             //lower the program break beacause blocks freed from the end of heap
