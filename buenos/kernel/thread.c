@@ -451,9 +451,8 @@ void thread_finish(void)
     KERNEL_ASSERT(thread_table[my_tid].pagetable == NULL);
 
     #ifdef CHANGED_4
-    // fully clear the TLB to make sure my entries
-    // aren't there anymore
-    tlb_clean();
+    // remove the tlb entries of the dying thread
+    tlb_clean_by_asid(my_tid);
     #endif
 
     spinlock_acquire(&thread_table_slock);

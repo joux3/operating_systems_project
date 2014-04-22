@@ -48,19 +48,63 @@
 extern virtual_page_t *virtual_pool;
 extern phys_page_t *phys_pool;
 
-// fully clean the TLB. useful when there might be many invalid TLB entries
-void tlb_clean(void)
+// remove TLB entries with the given ASID
+void tlb_clean_by_asid(uint32_t asid)
 {
     interrupt_status_t intr_status;
     intr_status = _interrupt_disable();
 
-    DEBUG("tlbdebug", "TLB: cleaning tlb\n");
-    tlb_entry_t zero_entry;
-    memoryset(&zero_entry, 0, sizeof(tlb_entry_t));
+    DEBUG("tlbdebug", "TLB: cleaning tlb by asid %d\n", asid);
+    tlb_entry_t tlb_entries[TLB_SIZE];
+    
+    _tlb_read(tlb_entries, 0, TLB_SIZE);
+
     uint32_t i;
-    for (i = 0; i <= _tlb_get_maxindex(); i++) {
-        _tlb_write(&zero_entry, i, 1);
+    for (i = 0; i < TLB_SIZE; i++) {
+        if (tlb_entries[i].ASID == asid) {
+            memoryset(&tlb_entries[i], 0, sizeof(tlb_entry_t));
+            _tlb_write(&tlb_entries[i], i, 1);
+        }
     }
+
+    _interrupt_set_state(intr_status);
+}
+
+// remove the TLB entry with the given physical address
+void tlb_clean_by_phys_addr(uint32_t phys_addr)
+{
+    interrupt_status_t intr_status;
+    intr_status = _interrupt_disable();
+
+    DEBUG("tlbdebug", "TLB: cleaning tlb by phys addr 0x%x\n", phys_addr);
+    tlb_entry_t tlb_entries[TLB_SIZE];
+    
+    _tlb_read(tlb_entries, 0, TLB_SIZE);
+
+    int removed_count = 0;
+    uint32_t i;
+    for (i = 0; i < TLB_SIZE; i++) {
+        int modified = 0;
+        tlb_entry_t *entry = &tlb_entries[i];
+        if (entry->V0 && entry->PFN0 == phys_addr >> 12) {
+            modified = 1;
+            entry->V0 = 0;
+            removed_count++;
+        }
+        if (entry->V1 && entry->PFN1 == phys_addr >> 12) {
+            modified = 1;
+            entry->V1 = 0;
+            removed_count++;
+        }
+
+        if (modified) {
+            _tlb_write(entry, i, 1);
+        }
+    }
+
+    // just a sanity check; tlb should never contain 
+    // two mappings to the same physical page
+    KERNEL_ASSERT(removed_count <= 1);
 
     _interrupt_set_state(intr_status);
 }

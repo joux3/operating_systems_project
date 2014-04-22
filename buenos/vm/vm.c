@@ -92,6 +92,7 @@ void vm_init(void)
     KERNEL_ASSERT(sizeof(pagetable_t) <= PAGE_SIZE);
     // also make sure that it's as full as possible
     KERNEL_ASSERT(PAGE_SIZE - sizeof(pagetable_t) < sizeof(pagetable_entry_t));
+    KERNEL_ASSERT(_tlb_get_maxindex() + 1 == TLB_SIZE);
 
     phys_pool_lock = lock_create();    
 
@@ -168,10 +169,10 @@ int swap_read_block(uint32_t block, uint32_t addr) {
 void swap_page(phys_page_t *phys_page) {
     KERNEL_ASSERT(phys_page->state == PAGE_IN_USE);
 
-    // at this point the old mapping for the physical page might be in TLB, so clean it.
+    // at this point the old mapping for the physical page might be in TLB, so remove it.
     // if we get a TLB miss to this page, vm_ensure_page_in_memory will block on 
     // phys_pool_lock so the same physical page won't be used
-    tlb_clean();
+    tlb_clean_by_phys_addr(phys_page->phys_address);
 
     // stop the phys page from being used
     virtual_pool[phys_page->virtual_page].phys_page = -1;

@@ -119,7 +119,10 @@ int _tlb_write(tlb_entry_t *entries, uint32_t index, uint32_t num);
 void _tlb_write_random(tlb_entry_t *entry);
 
 #ifdef CHANGED_4
-void tlb_clean(void);
+void tlb_clean_by_asid(uint32_t asid);
+void tlb_clean_by_phys_addr(uint32_t phys_addr);
+
+#define TLB_SIZE 16
 #endif
 
 #endif /* BUENOS_VM_TLB_H */
