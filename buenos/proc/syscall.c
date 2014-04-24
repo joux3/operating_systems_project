@@ -392,6 +392,7 @@ void *memlimit(void *heap_end)
         return NULL;
 
     uint32_t new_limit = (uint32_t)heap_end;
+    uint8_t error = 0;
     
     // just return the current memlimit
     if (heap_end == NULL)
@@ -399,12 +400,19 @@ void *memlimit(void *heap_end)
         
     if (new_limit > pagetable->memlimit) {
         DEBUG("memlimit", "Moving memlimit up...\n");
+        uint32_t original_memlimit = pagetable->memlimit;
         while((pagetable->memlimit & PAGE_SIZE_MASK) < (new_limit & PAGE_SIZE_MASK)) {
-            if (pagetable->valid_count == PAGETABLE_ENTRIES) // pagetable full
-                return NULL; // TODO: free the pages we successfully got before. that can be done by using the lowering memlimit code
+            if (pagetable->valid_count == PAGETABLE_ENTRIES) { // pagetable full
+                new_limit = original_memlimit;
+                error = 1;
+                goto lower;
+            }
             int new_page = vm_get_virtual_page();
-            if (new_page < 0)
-                return NULL; // TODO: free the pages we successfully got before. that can be done by using the lowering memlimit code
+            if (new_page < 0) {
+                new_limit = original_memlimit;
+                error = 1;
+                goto lower;
+            }
             pagetable->memlimit += PAGE_SIZE;
             vm_map(pagetable, new_page, pagetable->memlimit & PAGE_SIZE_MASK, 0);
             DEBUG("memlimit", " - mapped 0x%x -> virtual page %d\n", pagetable->memlimit & PAGE_SIZE_MASK, new_page);
@@ -413,6 +421,7 @@ void *memlimit(void *heap_end)
         pagetable->memlimit = new_limit;
         return (void*)new_limit;
     } 
+lower:
     if (new_limit < pagetable->memlimit) {
         DEBUG("memlimit", "Moving memlimit down...\n");
         while((pagetable->memlimit & PAGE_SIZE_MASK) > (new_limit & PAGE_SIZE_MASK)) {
@@ -422,6 +431,11 @@ void *memlimit(void *heap_end)
         }
         // put it where the userland wanted it even if we actually operate on pages
         pagetable->memlimit = new_limit;
+        if (error)
+            return NULL;
+        return (void*)new_limit;
+    }
+    if (new_limit == pagetable->memlimit && !error) {
         return (void*)new_limit;
     }
     return NULL;
