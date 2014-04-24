@@ -134,4 +134,15 @@ fashion and new virtual pages are mapped and old virtual pages unmapped as well.
 Testcase malloc_test.c
 -----------
 
+The malloc_test.c tests the malloc and free implementation. The setup is simple -
+it makes a few mallocs and frees consecutively, making sure that the right amount
+of memory in the right place is freed or allocated. The important things are that
+the malloc finds the free areas (so that you don't always push your stuff to the end
+of the heap) and that free actually frees when appropriate (when freeing such that
+there is a large deleted block in the end of the heap).
 
+You can run the malloc test from the shell using [testi]malloc_test command. If
+you want information on how the memlimit is working on the backgrounds, start up
+buenos with the memlimit flag, like on the previous example.
+
+Below is example output from the test, without the memlimit flag on the startup.
