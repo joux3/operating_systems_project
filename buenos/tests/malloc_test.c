@@ -29,24 +29,30 @@ void print_free(void *ptr) {
 
 int main(void) {
     prints("start test\n");
+    void* first_ptr;
     void* ptr_table[10];
     ptr_table[0] = print_malloc(2000);
+    first_ptr = ptr_table[0];
     ptr_table[1] = print_malloc(100);
     ptr_table[2] = print_malloc(500);
     ptr_table[3] = print_malloc(200);
 
     
     print_free(ptr_table[1]);
+    prints("this should divide a new deleted block");
     ptr_table[1] = print_malloc(30);
     
-    prints("free first three to get them merged\n");
+    prints("free first three, should merge into one \n");
     print_free(ptr_table[2]);
     print_free(ptr_table[1]);
     print_free(ptr_table[0]);
-    prints("free last, should lower memlimit to the ptr\n");
-    print_free(ptr_table[3]);
     
-    ptr_table[0] = print_malloc(2200);
+    prints("this should fit in the first allocated block now merged \n");
+    ptr_table[0] = print_malloc(2616);
+    if(ptr_table[0] != first_ptr)
+        return 1;
+
+    print_free(ptr_table[3]);
     print_free(ptr_table[0]);
     
 

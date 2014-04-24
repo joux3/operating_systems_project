@@ -145,4 +145,35 @@ You can run the malloc test from the shell using [testi]malloc_test command. If
 you want information on how the memlimit is working on the backgrounds, start up
 buenos with the memlimit flag, like on the previous example.
 
-Below is example output from the test, without the memlimit flag on the startup.
+Below is example output from the test, with the memlimit flag on the startup.
+
+> [testi]malloc_test
+start test
+Moving memlimit up...
+Allocated, ptr is 12304
+Current memlimit is 14304
+Moving memlimit up...
+Allocated, ptr is 14312
+Current memlimit is 14412
+Moving memlimit up...
+Allocated, ptr is 14420
+Current memlimit is 14920
+Moving memlimit up...
+Allocated, ptr is 14928
+Current memlimit is 15128
+Dallocated first block, memlimit is 15128
+this should divide a new deleted blockAllocated, ptr is 14312
+Current memlimit is 15128
+free first three, should merge into one 
+Dallocated first block, memlimit is 15128
+Dallocated first block, memlimit is 15128
+Dallocated first block, memlimit is 15128
+this should fit in the first allocated block now merged 
+Allocated, ptr is 12304
+Current memlimit is 15128
+Moving memlimit down...
+Dallocated first block, memlimit is 14920
+Moving memlimit down...
+Dallocated first block, memlimit is 12296
+return value: 0
+
