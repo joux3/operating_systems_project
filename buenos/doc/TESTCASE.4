@@ -6,17 +6,132 @@ Members
   Miro Nurmela
   Olli-Matti Saario
 
-  ----------
-  Testcase bigbinary.c
-  ----------
+----------
+Testcase bigbinary.c
+----------
 
-  This testcase tests the paging and virtual memory by creating a large
-  array and accessing it. The entire array shouldn't fit the memory and
-  the accesses should cause TLB misses, thus veryfing that the TLB and
-  paging implementations work.
+This testcase tests the paging and virtual memory by creating a large
+array and accessing it. The entire array shouldn't fit the memory and
+the accesses should cause TLB misses, thus veryfing that the TLB and
+paging implementations work.
 
-  The test is located in tests/bigbinary.c
+The test is located in tests/bigbinary.c
 
-  And it can be run from the shell with [test]bigbinary command.
+It can be run from the shell with [test]bigbinary command. The shell
+can be run with the command yams buenos initprog="[testi]shell".
 
-  Here's an example output.
+The test doesn't actually output anything, but the functioning of the
+paging system can bee seen from the fact that you can start a lot of
+these programs on the backgrounds - without paging, you can only run
+three instances of bigbinary, but with the addition of paging you can
+run up to eight instances of the test program. You can run programs in
+the background in the shell by appending & to the command, like this:
+
+    Welcome. This is YAMS virtual terminal.
+
+    BUENOS is a University Educational Nutshell Operating System
+    ==========================================================
+
+    Copyright (C) 2003-2006  Juha Aatrokoski, Timo Lilja,
+      Leena Salmela, Teemu Takanen, Aleksi Virtanen
+    See the file COPYING for licensing details.
+
+    Initializing memory allocation system
+    Kernel size is 0x0003b3a4 (242596) bytes
+    System memory size is 0x000a0000 (655360) bytes
+    Reading boot arguments
+    Detected 1 CPUs
+    Initializing interrupt handling
+    Initializing threading system
+    Initializing sleep queue
+    Initializing semaphores
+    Initializing locks and condition variables
+    Initializing process tables
+    Initializing device drivers
+    Device: Type 0x401 at 0xb0008060 irq 0x2 driver 'NIC'
+    Device: Type 0x201 at 0xb0008054 irq 0x4 driver 'Console'
+    Device: Type 0x301 at 0xb0008040 irq 0x3 driver 'Disk'
+    Device: Type 0x301 at 0xb000802c irq 0x3 driver 'Disk'
+    Device: Type 0x301 at 0xb0008018 irq 0x3 driver 'Disk'
+    Device: Type 0xc00 at 0xb0008010 irq 0x0 driver 'CPU status'
+    Device: Type 0x101 at 0xb000800c no irq  driver 'System memory information'
+    Device: Type 0x102 at 0xb0008004 no irq  driver 'System RTC'
+    Device: Type 0x103 at 0xb0008000 no irq  driver 'System shutdown'
+    Initializing virtual filesystem
+    VFS: Max filesystems: 8, Max open files: 512
+    Initializing scheduler
+    Initializing virtual memory
+    Pagepool: using the disk at 0xb000802c for swap, 500 virtual pages
+    Pagepool: Found 160 pages of size 4096
+    Pagepool: Static allocation for kernel: 79 pages
+    Creating initialization thread
+    Starting threading system and SMP
+    Mounting filesystems
+    VFS: SFS initialized on disk at 0xb0008040
+    VFS: Mounted filesystem volume [sfs]
+    VFS: No filesystem was found on block device 0xb000802c
+    VFS: TFS initialized on disk at 0xb0008018
+    VFS: Mounted filesystem volume [testi]
+    Initializing networking
+    Network: started network services on device at address 0f01beef
+    Starting initial program '[testi]shell'
+    > [testi]bigbinary&
+    started process 1 in background
+    > [testi]bigbinary&
+    started process 2 in background
+    > [testi]bigbinary&
+    started process 3 in background
+    > [testi]bigbinary&
+    started process 4 in background
+    > [testi]bigbinary&
+    started process 5 in background
+    > 
+
+----------------
+Testcase memlimit.c
+----------------
+
+The memlimit.c test tests the memlimit syscall, which is used as a basis for the
+malloc and free userland programs. The memlimit test is vety simple - it moves
+the memlimit around, forcing the system to map and unmap new virtual pages.
+
+The memlimit test can be run from the shell and we recommed using the memlimit
+flag when you start up the buenos - this will enable the debug prints in the
+virtual memory so you can see when the system maps and unmaps new pages.
+
+So the buenos startup command would be yams buenos initprog="[testi]shell" memlimit.
+And the test can be run from the shell with the [testi]memlimit command.
+
+Here's sample output using the memlimit flag on startup.
+
+    > [testi]memlimit
+    Current memlimit is 12296
+    Requesting 1 bytes more memory
+    Moving memlimit up...
+    Current memlimit is 12297
+    Requesting 12052 bytes more memory
+    Moving memlimit up...
+     - mapped 0x4000 -> virtual page 8
+     - mapped 0x5000 -> virtual page 9
+    Current memlimit is 24349
+    Requesting 6000 bytes less memory
+    Moving memlimit down...
+     - unmapping 0x5000
+    Current memlimit is 18349
+    Requesting 6052 bytes less memory
+    Moving memlimit down...
+     - unmapping 0x4000
+    Current memlimit is 12297
+    Requesting 1 bytes less memory
+    Moving memlimit down...
+    Current memlimit is 12296
+    return value: 0
+
+From this we can clearly see that the memlimit is moved around in a reasonable
+fashion and new virtual pages are mapped and old virtual pages unmapped as well.
+
+-----------
+Testcase malloc_test.c
+-----------
+
+
