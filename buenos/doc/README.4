@@ -17,6 +17,7 @@ Assignment 1
     - vm/tlb.h
     - vm/vm.c
     - kernel/thread.c
+    - proc/process.c (removed tlb_fill usage)
 
 2. Description of the solution
     - we removed the naive tlb_fill usage
@@ -34,8 +35,8 @@ Assignment 1
       the MIPS architecture)
     - when a thread finishes, remove all the threads markings from the tlb
 
-    NOTE: the initial implementaion was based on the pre virtual memory implementaion, and
-          most of the logic was rewritten when the paginv was implemented.
+    NOTE: the initial implementation was based on the pre virtual memory implementation, and
+          most of the logic was rewritten when the paging was implemented.
 
 3. Motivation behind the solution
     - the solution is simple enough and fulfills the criteria of the assignment
@@ -60,13 +61,13 @@ Assignment 2
     - kernel/thread.c
 
 2. Description of the solution
-    - for the pagine we implemented a virtual pagepool on top of the physical pagepool already
+    - for the paging we implemented a virtual pagepool on top of the physical pagepool already
       present in the BUENOS source code
     - in practice this is done with two tables (one that holds information about all the virtual
       pages and one that holds information of all the virtual pages that are currently in memory)
         - the first table is the page entry table and the second one the physical page table
         - the index of the page entry table also corresponds to the location on the swap disk
-    - the structures in these tables contain other informtation as well, such as are the pages
+    - the structures in these tables contain other information as well, such as are the pages
       dirty and when they were last accessed
     - there's a swap disk that has blocks the size of a page
     - during the initialization of the virtual memory system we reserve half of the physical
@@ -76,10 +77,10 @@ Assignment 2
     - storing the latest access to the page is used to implement the LRU replacement policy,
       which is simple but works just fine
     - in the case of tlb miss (read or write)
-        - if the virtual page is laready in memory, put the physical address in the tlb
+        - if the virtual page is already in memory, put the physical address in the tlb
         - if not, fetch the address from the physical page table (and swap out the oldest entry,
           if the desired address is not found) and put the acquired address to the tlb
-        - in the case of sotre miss, mark the physical page dirty
+        - in the case of store miss, mark the physical page dirty
     - if we encounter a tlb modify, mark the physical page dirty and update the access time
     - when swapping out pages, only write things to disk if the page is marked dirty
 
@@ -87,7 +88,8 @@ Assignment 2
     - building on top of the existing page pool made the implementation simpler
 
 4. Changes to the plan presented in the review session
-    - none
+    - our plan didn't include the write protected status for pages, but we added it to
+      support read-only pages
 
 ------------
 
@@ -102,7 +104,7 @@ Assignment 3
     - the memlimit syscall is implemented as follows
         - when a process starts, store the highest used memory region
         - when userland queries for a new memlimit
-            - if more memory is queried, move memlimit forwards and resrve necessary
+            - if more memory is queried, move memlimit forwards and reserve necessary
               virtual pages
             - if lesser memory is queried, free virtual pages if possible
         - kernel will always reserve full pages, but the user asked memlimit is nevertheless
