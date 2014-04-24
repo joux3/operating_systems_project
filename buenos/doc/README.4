@@ -34,6 +34,9 @@ Assignment 1
       the MIPS architecture)
     - when a thread finishes, remove all the threads markings from the tlb
 
+    NOTE: the initial implementaion was based on the pre virtual memory implementaion, and
+          most of the logic was rewritten when the paginv was implemented.
+
 3. Motivation behind the solution
     - the solution is simple enough and fulfills the criteria of the assignment
 
@@ -91,9 +94,37 @@ Assignment 2
 Assignment 3
 
 1. Changed files
+    - tests/lib.c
+    - tests/lib.h
+    - proc/syscall.c
 
 2. Description of the solution
+    - the memlimit syscall is implemented as follows
+        - when a process starts, store the highest used memory region
+        - when userland queries for a new memlimit
+            - if more memory is queried, move memlimit forwards and resrve necessary
+              virtual pages
+            - if lesser memory is queried, free virtual pages if possible
+        - kernel will always reserve full pages, but the user asked memlimit is nevertheless
+          returned to the user and not the ends of the pages
+    - the malloc and free are heap based
+    - for the malloc and free, there's an allocated structure that tells the size of an
+      allocated area and if it's been deleted
+    - the malloc is implemented as follows
+        - go through all the allocated areas
+        - if there is a big enough allocated area that is marked deleted, take an
+          appropriately sized chunk from it and allocate that (the rest remains marked
+          deleted)
+        - if there is no appropriate area, increase the heap size and create a new area
+    - free is implemented as follows
+        - find the allocated structure of the desired area
+        - mark the area deleted
+        - if there are consecutive deleted areas from the just deleted area to the top of
+          the heap, lower the top of the heap (thus freeing the space)
+                
 
 3. Motivation behind the solution
+    - simple is good
 
 4. Changes to the plan presented in the review session
+    - none
