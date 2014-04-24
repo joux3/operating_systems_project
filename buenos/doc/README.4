@@ -11,12 +11,34 @@ Members
 Assignment 1
 
 1. Changed files
+    - kernel/exception.c
+    - proc/exception.c
+    - vm/tlb.c
+    - vm/tlb.h
+    - vm/vm.c
+    - vm/thread.c
 
 2. Description of the solution
+    - we removed the naive tlb_fill usage
+    - we improved the userland and kernel exception handlers
+        - first of all, remove the placeholder kernel panics
+        - implement functions to handle the tlb exceptions
+    - in the case of tlb modification, mark the appropriate pages dirty (in the tlb and in
+      the physical pagetable)
+    - in the case of tlb miss (read or write) we go to the page table of the current thread
+      and try inserting that to the tlb
+        - if the address cannot be found, panic the kernel (if thread running in kernel mode)
+          or kill the process (if the thread running as an userland process or we are copying
+          from or to kernel)
+    - write to the tlb randomly (since we don't have enough room to store LRU information in
+      the MIPS architecture)
+    - when a thread finishes, remove all the threads markings from the tlb
 
 3. Motivation behind the solution
+    - the solution is simple enough and fulfills the criteria of the assignment
 
 4. Changes to the plan presented in the review session
+    - none
 
 ---------
 
