@@ -16,7 +16,7 @@ Assignment 1
     - vm/tlb.c
     - vm/tlb.h
     - vm/vm.c
-    - vm/thread.c
+    - kernel/thread.c
 
 2. Description of the solution
     - we removed the naive tlb_fill usage
@@ -45,12 +45,46 @@ Assignment 1
 Assignment 2
 
 1. Changed files
+    - kernel/exception.c
+    - proc/exception.c
+    - proc/process.c
+    - proc/syscall.c
+    - vm/tlb.c
+    - vm/tlb.h
+    - vm/vm.c
+    - vm/vm.h
+    - vm/pagetable.h
+    - kernel/thread.c
 
 2. Description of the solution
+    - for the pagine we implemented a virtual pagepool on top of the physical pagepool already
+      present in the BUENOS source code
+    - in practice this is done with two tables (one that holds information about all the virtual
+      pages and one that holds information of all the virtual pages that are currently in memory)
+        - the first table is the page entry table and the second one the physical page table
+        - the index of the page entry table also corresponds to the location on the swap disk
+    - the structures in these tables contain other informtation as well, such as are the pages
+      dirty and when they were last accessed
+    - there's a swap disk that has blocks the size of a page
+    - during the initialization of the virtual memory system we reserve half of the physical
+      pagepool pages for the paging system
+    - when requesting a virtual page, we seek an empty slot in the virtual page table and mark
+      the corresponding place occupied in the swap disk (if no free slots, return error)
+    - storing the latest access to the page is used to implement the LRU replacement policy,
+      which is simple but works just fine
+    - in the case of tlb miss (read or write)
+        - if the virtual page is laready in memory, put the physical address in the tlb
+        - if not, fetch the address from the physical page table (and swap out the oldest entry,
+          if the desired address is not found) and put the acquired address to the tlb
+        - in the case of sotre miss, mark the physical page dirty
+    - if we encounter a tlb modify, mark the physical page dirty and update the access time
+    - when swapping out pages, only write things to disk if the page is marked dirty
 
 3. Motivation behind the solution
+    - building on top of the existing page pool made the implementation simpler
 
 4. Changes to the plan presented in the review session
+    - none
 
 ------------
 
