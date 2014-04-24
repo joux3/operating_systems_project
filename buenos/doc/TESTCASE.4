@@ -5,3 +5,18 @@ Members
   Antti Risteli
   Miro Nurmela
   Olli-Matti Saario
+
+  ----------
+  Testcase bigbinary.c
+  ----------
+
+  This testcase tests the paging and virtual memory by creating a large
+  array and accessing it. The entire array shouldn't fit the memory and
+  the accesses should cause TLB misses, thus veryfing that the TLB and
+  paging implementations work.
+
+  The test is located in tests/bigbinary.c
+
+  And it can be run from the shell with [test]bigbinary command.
+
+  Here's an example output.
