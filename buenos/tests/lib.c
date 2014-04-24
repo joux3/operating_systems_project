@@ -288,6 +288,13 @@ typedef struct {
     uint32_t is_deleted;
 } alloc_header_t;
 
+void print_mem(uint32_t ptr) {
+    char buf[24];
+    itoa((int)ptr, buf);
+    prints(buf);
+    prints("\n");
+}
+
 void *malloc(uint32_t size) {
     uint32_t  new_memlimit;
     uint32_t heap_end;
@@ -301,14 +308,19 @@ void *malloc(uint32_t size) {
     //ceil the size to next word bouyndary
     size = 3&size ? (~3&size)+4 : size;
     cur_header = (alloc_header_t*)heap_bottom;
+    print_mem((uint32_t)heap_bottom);
+    print_mem((uint32_t)heap_end);
     //check if free holes big enough in the already allocated area
     while(heap_end > heap_bottom && cur_header->size + (uint32_t)cur_header + sizeof(alloc_header_t) < heap_end) {
+        prints("try to fill a hole\n");
         //if fits here
         if(cur_header->is_deleted && (cur_header->size >= size)) {
+            prints("found a hole\n");
             //if there is space to divide the end of the space to a new block 
             if(cur_header->size > size + sizeof(alloc_header_t) + MIN_FRAGMENT) {
+                prints("make a new block\n");
                 alloc_header_t *new_block_header = (alloc_header_t*)((uint32_t)cur_header + size + sizeof(alloc_header_t));
-                new_block_header->is_deleted = 0;
+                new_block_header->is_deleted = 1;
                 new_block_header->size = cur_header->size - size - sizeof(alloc_header_t); 
                //this only here because otherwise we keep the allocated size same
                 cur_header->size = size;
@@ -316,7 +328,7 @@ void *malloc(uint32_t size) {
             cur_header->is_deleted = 0;
             return (void*)((uint32_t)cur_header + sizeof(alloc_header_t));
         }
-        cur_header += cur_header->size + sizeof(alloc_header_t);
+        cur_header = (alloc_header_t*)((uint32_t)cur_header + cur_header->size + sizeof(alloc_header_t));
     }
     //couldnt find big enough hole so we have to move the program break
     // query current memlimit
@@ -334,6 +346,7 @@ void *malloc(uint32_t size) {
     return (void*)((uint32_t)cur_header + sizeof(alloc_header_t));
 }
 
+
 void free(void *ptr) {
     uint32_t heap_end;
     alloc_header_t *cur_header;
@@ -346,11 +359,17 @@ void free(void *ptr) {
     cur_header->is_deleted = 1;
     bottom_header = cur_header;
     //start merging deleted areas from this point onwards
-    while(cur_header->is_deleted > 0) {
-        if(bottom_header != cur_header)
+    while(cur_header->is_deleted > 0 && (uint32_t)cur_header < heap_end) {
+        prints("found delted block\n");
+        if(bottom_header != cur_header) {
+            prints("merge blocks\n");
             bottom_header->size += cur_header->size + sizeof(alloc_header_t); 
+            print_mem(bottom_header->size);
+            print_mem((uint32_t)bottom_header);
+        }
         cur_header = (alloc_header_t*)((uint32_t)cur_header + cur_header->size + sizeof(alloc_header_t));
         if((uint32_t)cur_header >= heap_end - sizeof(alloc_header_t)) {
+            prints("over the top\n");
             //lower the program break beacause blocks freed from the end of heap
             syscall_memlimit((void*)bottom_header);
             break;
